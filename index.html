@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fix Your Life</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              warmWhite: '#FAFAF9',
+              charcoal: '#333333',
+              stone: {
+                50: '#fafaf9',
+                100: '#f5f5f4',
+                200: '#e7e5e4',
+                300: '#d6d3d1',
+                800: '#292524',
+                900: '#1c1917',
+              },
+              warmOrange: '#F97316',
+              warmPurple: '#A855F7',
+            },
+            fontFamily: {
+              serif: ['"Playfair Display"', 'serif'],
+              sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            },
+            animation: {
+              float: 'float 6s ease-in-out infinite',
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              breathe: 'breathe 8s ease-in-out infinite',
+              inhale: 'inhale 0.6s ease-out forwards',
+              'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
+              'particle-fly': 'particleFly 0.6s ease-in forwards',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-20px)' },
+              },
+              breathe: {
+                '0%, 100%': { transform: 'scale(1)', filter: 'brightness(1)' },
+                '50%': { transform: 'scale(1.02)', filter: 'brightness(1.05)' },
+              },
+              inhale: {
+                '0%': { transform: 'scale(1)' },
+                '50%': { transform: 'scale(0.95)' },
+                '100%': { transform: 'scale(1)' },
+              },
+              fadeInUp: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              particleFly: {
+                '0%': { opacity: '1', transform: 'translate(0, 0) scale(1)' },
+                '100%': { opacity: '0', transform: 'translate(-50vw, -50vh) scale(0)' },
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+      html { scroll-behavior: smooth; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .defer-section {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 900px;
+      }
+      .landing-background {
+        --landing-warm-mist: 248, 220, 190;
+        --landing-cream-mist: 250, 232, 210;
+        --landing-purple-mist: 231, 221, 242;
+        --landing-soft-purple-mist: 236, 228, 244;
+        --landing-rose-mist: 248, 226, 218;
+        background-color: #FAFAF9;
+        background-image:
+          radial-gradient(circle 50vw at -4% 8%, rgba(var(--landing-warm-mist), 0.38), rgba(var(--landing-warm-mist), 0.12) 44%, transparent 78%),
+          radial-gradient(circle 50vw at 104% 15%, rgba(var(--landing-purple-mist), 0.42), rgba(var(--landing-purple-mist), 0.15) 44%, transparent 78%),
+          radial-gradient(circle 50vw at -6% 31%, rgba(var(--landing-cream-mist), 0.34), rgba(var(--landing-cream-mist), 0.11) 46%, transparent 80%),
+          radial-gradient(circle 50vw at 108% 42%, rgba(var(--landing-soft-purple-mist), 0.40), rgba(var(--landing-soft-purple-mist), 0.14) 44%, transparent 78%),
+          radial-gradient(circle 50vw at -5% 57%, rgba(var(--landing-rose-mist), 0.32), rgba(var(--landing-rose-mist), 0.11) 46%, transparent 80%),
+          radial-gradient(circle 50vw at 105% 66%, rgba(var(--landing-warm-mist), 0.34), rgba(var(--landing-warm-mist), 0.11) 44%, transparent 78%),
+          radial-gradient(circle 50vw at -4% 78%, rgba(var(--landing-purple-mist), 0.38), rgba(var(--landing-purple-mist), 0.13) 46%, transparent 80%),
+          radial-gradient(circle 50vw at 104% 88%, rgba(var(--landing-cream-mist), 0.34), rgba(var(--landing-cream-mist), 0.11) 44%, transparent 78%),
+          radial-gradient(circle 50vw at 24% 104%, rgba(var(--landing-soft-purple-mist), 0.34), rgba(var(--landing-soft-purple-mist), 0.12) 46%, transparent 80%),
+          linear-gradient(180deg, #FAFAF9 0%, #FFFCF8 34%, #FAFAF9 63%, #FCFAFF 100%);
+        background-repeat: no-repeat;
+        background-size: 100% 100%;
+      }
+      .hero-fog-tint {
+        background: linear-gradient(135deg, rgba(255, 237, 213, 0.45), rgba(250, 250, 249, 0.52), rgba(243, 232, 255, 0.42));
+      }
+      .hero-soft-white-mask {
+        background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.58) 56%, rgba(250, 250, 249, 0.78) 100%);
+      }
+      .hero-top-image-fade {
+        background: linear-gradient(180deg, #FAFAF9 0%, rgba(250, 250, 249, 0.70) 42%, transparent 100%);
+      }
+      .hero-bottom-image-fade {
+        background: linear-gradient(180deg, transparent 0%, rgba(250, 250, 249, 0.55) 48%, #FAFAF9 100%);
+      }
+      .insight-card-breath {
+        animation: cardBreath 2600ms cubic-bezier(0.45, 0, 0.2, 1);
+      }
+      @keyframes cardBreath {
+        0% { transform: scale(0.996); }
+        58% { transform: scale(1.014); }
+        100% { transform: scale(1); }
+      }
+    </style>
+  </head>
+  <body class="bg-warmWhite text-charcoal antialiased">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

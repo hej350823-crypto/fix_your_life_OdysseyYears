@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Test future self portrait</title>
+  <desc id="desc">A luminous abstract future-self portrait placeholder for testing the final reveal.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff7ed"/>
+      <stop offset="0.52" stop-color="#fef3c7"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="50%" cy="18%" r="62%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="0.48" stop-color="#fdba74" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#fdba74" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+  </defs>
+  <rect width="900" height="1200" fill="url(#bg)"/>
+  <circle cx="450" cy="260" r="420" fill="url(#sun)"/>
+  <path d="M210 900c44-184 121-290 240-290s196 106 240 290c-110 82-370 82-480 0Z" fill="#a16207" opacity="0.22" filter="url(#soft)"/>
+  <circle cx="450" cy="390" r="132" fill="#92400e" opacity="0.24"/>
+  <path d="M315 500c90 68 180 68 270 0" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" opacity="0.62"/>
+  <path d="M245 238c48-70 118-120 205-120s157 50 205 120" fill="none" stroke="#ffffff" stroke-width="8" opacity="0.72"/>
+  <text x="450" y="1060" text-anchor="middle" fill="#78350f" font-family="Arial, sans-serif" font-size="38" opacity="0.78">Future Self / 测试结果</text>
+</svg>
