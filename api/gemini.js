@@ -258,6 +258,7 @@ const escapeHtml = (value = '') => value
 const formatCapsuleMessageHtml = (message = '') => escapeHtml(message).replace(/\n/g, '<br />');
 
 const isValidEmail = (email = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const getAdminPassword = () => process.env.ADMIN_PASSWORD || process.env.PROMPT_ADMIN_PASSWORD || '';
 
 const buildTimeCapsuleEmail = ({ userName, message, imageUrl, sendAt, language }) => {
   const safeName = escapeHtml(userName || (language === 'zh' ? '朋友' : 'friend'));
@@ -716,6 +717,27 @@ const handleCurrentPortrait = async (body) => {
   });
 };
 
+const handleAdminAuth = async (body) => {
+  const configuredPassword = getAdminPassword();
+
+  if (!configuredPassword) {
+    throw createApiError('Admin password is not configured.', 503, {
+      errorType: 'config',
+      hint: '请在环境变量里设置 ADMIN_PASSWORD 或 PROMPT_ADMIN_PASSWORD。',
+    });
+  }
+
+  const providedPassword = typeof body.password === 'string' ? body.password : '';
+  if (providedPassword !== configuredPassword) {
+    throw createApiError('Invalid admin password.', 401, {
+      errorType: 'auth',
+      hint: '密码不正确，请再试一次。',
+    });
+  }
+
+  return { ok: true };
+};
+
 const handleTimeCapsule = async (body) => {
   const { email, message, imageUrl, sendAt, userName, language = 'zh' } = body;
 
@@ -801,6 +823,10 @@ export default async function handler(req, res) {
 
     if (body.action === 'current-portrait') {
       return sendJson(res, 200, await handleCurrentPortrait(body));
+    }
+
+    if (body.action === 'admin-auth') {
+      return sendJson(res, 200, await handleAdminAuth(body));
     }
 
     if (body.action === 'time-capsule') {

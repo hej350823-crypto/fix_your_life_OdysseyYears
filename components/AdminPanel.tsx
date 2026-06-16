@@ -91,15 +91,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             <h2 className="font-serif text-xl">{isZh ? '现在能做什么' : 'What this controls'}</h2>
             <p className="mt-3 text-sm leading-6 text-stone-500">
               {isZh
-                ? '这里先不加密码。你可以直接调整聊天主提示词、用户画像提示词、未来/当前图片提示词、未来信提示词和时间胶囊提示词。配置会保存在当前浏览器，下一次真实 API 调用会带给后端。'
-                : 'No password yet. You can tune the chat system prompt, user persona prompt, future/current image prompts, future letter prompt, and time capsule prompt. Settings are saved in this browser and sent with future API calls.'}
+                ? '你可以在这里调整聊天主提示词、用户画像提示词、未来/当前图片提示词、未来信提示词和时间胶囊提示词。配置会保存在当前浏览器，下一次真实 API 调用会带给后端。'
+                : 'You can tune the chat system prompt, user persona prompt, future/current image prompts, future letter prompt, and time capsule prompt here. Settings are saved in this browser and sent with future API calls.'}
             </p>
           </div>
 
           <div className="rounded-lg border border-orange-100 bg-orange-50 p-5 text-sm leading-6 text-orange-900">
             {isZh
-              ? '上线前如果要真正保护后台，再加登录或环境变量密码。现在先保留轻量入口，方便你调产品感觉。'
-              : 'Before launch, this can be protected with login or an environment password. For now it stays light so you can tune the product quickly.'}
+              ? '当前后台需要密码验证。建议只在你自己的受控环境中使用，并定期更换环境变量密码。'
+              : 'This console now requires password verification. It is still best used in a controlled environment with a rotated environment password.'}
           </div>
 
           {status && (
