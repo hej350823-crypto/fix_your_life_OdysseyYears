@@ -7,6 +7,7 @@ interface TimeCapsuleProps {
   userName: string;
   language: Language;
   sealedLetter: string;
+  imageUrl: string;
   onBack: () => void;
   onRestart: () => void;
 }
@@ -32,7 +33,7 @@ const formatDate = (date: Date, language: Language) => {
   }).format(date);
 };
 
-const TimeCapsule: React.FC<TimeCapsuleProps> = ({ userName, language, sealedLetter, onBack, onRestart }) => {
+const TimeCapsule: React.FC<TimeCapsuleProps> = ({ userName, language, sealedLetter, imageUrl, onBack, onRestart }) => {
   const text = t(language).timeCapsule;
   const [email, setEmail] = useState('');
   const [delay, setDelay] = useState<TimeCapsuleDelay>('oneYear');
@@ -51,6 +52,7 @@ const TimeCapsule: React.FC<TimeCapsuleProps> = ({ userName, language, sealedLet
         userName,
         email,
         message: sealedLetter,
+        imageUrl,
         sendAt: sendDate.toISOString(),
         delay,
         language,
@@ -77,6 +79,22 @@ const TimeCapsule: React.FC<TimeCapsuleProps> = ({ userName, language, sealedLet
             <p className="text-xs uppercase tracking-[0.24em] text-warmOrange font-semibold">{text.eyebrow}</p>
             <h1 className="font-serif text-4xl md:text-6xl text-charcoal leading-tight">{text.title}</h1>
             <p className="font-sans text-lg text-stone-600 leading-relaxed">{text.description}</p>
+            <div className="max-w-sm overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(120,113,108,0.16)]">
+              <div className="aspect-[3/4] bg-stone-100">
+                <img
+                  src={imageUrl}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                  alt={language === 'zh' ? '今天的自己' : 'Present self'}
+                />
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-400">
+                  {language === 'zh' ? '今天的画像' : 'Present portrait'}
+                </p>
+              </div>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="rounded-[28px] bg-white/92 p-7 md:p-12 shadow-[0_28px_80px_rgba(120,113,108,0.18)] border border-white/80 space-y-8 backdrop-blur">

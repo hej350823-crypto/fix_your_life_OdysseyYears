@@ -3,9 +3,18 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import geminiHandler from './api/gemini.js';
 
+const runNetworkFix = async () => {
+  try {
+    await import('./scripts/fix-network.mjs');
+  } catch (error) {
+    console.warn('[local-api] Network fix skipped.', error);
+  }
+};
+
 const localApiPlugin = (): Plugin => ({
   name: 'local-api',
   configureServer(server) {
+    void runNetworkFix();
     server.middlewares.use('/api/gemini', async (req, res) => {
       if (req.method !== 'POST') {
         res.statusCode = 405;

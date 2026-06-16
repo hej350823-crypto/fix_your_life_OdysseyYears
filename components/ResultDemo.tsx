@@ -15,7 +15,7 @@ const showcaseCardClass =
 
 const ResultDemo: React.FC<ResultDemoProps> = ({ language }) => {
   const text = t(language).resultDemo;
-  const [activePanel, setActivePanel] = useState<ResultPanel>('portrait');
+  const [activePanel, setActivePanel] = useState<ResultPanel | null>(null);
   const portraitRef = useRef<HTMLDivElement>(null);
   const capsuleRef = useRef<HTMLDivElement>(null);
 
@@ -51,10 +51,10 @@ const ResultDemo: React.FC<ResultDemoProps> = ({ language }) => {
   }, []);
 
   const panelClass = (panel: ResultPanel) =>
-    `transition-all duration-900 ease-out will-change-transform ${
+    `transition-[transform,opacity,filter,box-shadow] duration-1000 ease-out will-change-transform ${
       activePanel === panel
-        ? 'scale-100 translate-y-0 opacity-100'
-        : 'scale-[0.88] translate-y-8 opacity-35'
+        ? 'scale-100 translate-y-0 opacity-100 blur-0'
+        : 'scale-[0.76] translate-y-14 opacity-20 blur-[1.5px]'
     }`;
   const cardShadowClass = (panel: ResultPanel) =>
     activePanel === panel

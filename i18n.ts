@@ -1,6 +1,16 @@
 import { Language, TestProfile } from './types';
 import { TEST_DATA } from './mock/testData';
 
+type PainPointOption = {
+  title: string;
+  preview: string;
+};
+
+type PainPointGroup = {
+  title: string;
+  options: PainPointOption[];
+};
+
 type Copy = {
   app: {
     languageLabel: string;
@@ -57,11 +67,16 @@ type Copy = {
     photoSubtitle: string;
     upload: string;
     useTestPhoto: string;
-    skipPhoto: string;
+    photoRequired: string;
     photoQuote: string;
     start: string;
     privacyNote: string;
-    painPoints: string[];
+    painLead: string;
+    painHint: string;
+    painSelectionCount: string;
+    painPreviewDefaultTitle: string;
+    painPreviewDefaultBody: string;
+    painPointGroups: PainPointGroup[];
   };
   chat: {
     exit: string;
@@ -106,6 +121,7 @@ type Copy = {
   test: {
     profile: TestProfile;
     finalLetter: string;
+    timeCapsuleLetter: string;
   };
 };
 
@@ -118,7 +134,7 @@ export const copy: Record<Language, Copy> = {
     },
     hero: {
       title: 'Fix Your Life.',
-      subtitle: '你只是暂时看不清方向。',
+      subtitle: '你只是暂时看不清方向',
       description: '当人生还没有答案，先别急着逼自己靠岸。不是急着改造自己，而是重新校准方向。',
       cta: '开始穿过迷雾',
       scrollHint: '向下看看为什么',
@@ -179,17 +195,91 @@ export const copy: Record<Language, Copy> = {
       photoSubtitle: '我们只在本次体验中使用它，测试时也可以直接用模拟照片。',
       upload: '上传照片',
       useTestPhoto: '使用测试照片',
-      skipPhoto: '跳过照片',
+      photoRequired: '请先上传照片，才能开始对话。',
       photoQuote: '“画面可以模糊，但诚实会让方向变清楚。”',
       start: '开始对话',
       privacyNote: '测试模式不会调用真实 API，也不会上传图片。',
-      painPoints: ['方向感消失', '对未来焦虑', '反复拖延', '不知道自己是谁', '很努力但没靠岸感', '想逃离现在', '空心感'],
+      painLead: '哪些词，最接近你最近的状态？',
+      painHint: '先不用选得很准确，把那些说中了你的词点下来就好。',
+      painSelectionCount: '已选择 {count} 个',
+      painPreviewDefaultTitle: '从一个最像你的入口开始',
+      painPreviewDefaultBody: '把鼠标停在某个词上看看，或者直接点中它。我们会从你最有感觉的地方开始往下走。',
+      painPointGroups: [
+        {
+          title: '自我与状态',
+          options: [
+            {
+              title: '空心感',
+              preview: '心里总是空落落的，好像没有什么真正让我想靠近。',
+            },
+            {
+              title: '想逃离现在',
+              preview: '每天都想离开现在的生活，可我也不知道还能去哪里。',
+            },
+            {
+              title: '意义感流失',
+              preview: '日子在照常往前走，但我越来越说不清这样活着是为了什么。',
+            },
+          ],
+        },
+        {
+          title: '选择与未来',
+          options: [
+            {
+              title: '无靠岸感',
+              preview: '明明一直在努力，却始终没有那种真正落地、安心的感觉。',
+            },
+            {
+              title: '决策瘫痪',
+              preview: '站在人生的分岔口，越想选对，越不敢迈出下一步。',
+            },
+            {
+              title: '方向迷失',
+              preview: '眼前好像有很多条路，可我不知道哪一条才更像我自己的。',
+            },
+          ],
+        },
+        {
+          title: '能量与行动',
+          options: [
+            {
+              title: '拖延与自责',
+              preview: '越拖越动不了，越动不了就越责怪自己。',
+            },
+            {
+              title: '精神低电量',
+              preview: '我不是不想开始，只是真的像一点力气都没有了。',
+            },
+            {
+              title: '试错疲惫',
+              preview: '试过一些可能，却一次次失望，现在连再试一次都觉得累。',
+            },
+          ],
+        },
+        {
+          title: '关系与外界',
+          options: [
+            {
+              title: '同辈压力',
+              preview: '别人好像都在往前走，只有我还停在原地找不到节奏。',
+            },
+            {
+              title: '不被理解',
+              preview: '我很想把心里的困惑说清楚，但总觉得没人真的听懂。',
+            },
+            {
+              title: '迎合期待',
+              preview: '我一直在努力成为别人希望的样子，却越来越看不见自己。',
+            },
+          ],
+        },
+      ],
     },
     chat: {
       exit: '退出',
       thinking: '思考中',
-      generating: 'AI 正在根据你的回答描绘未来的岸...',
-      generatingSub: '穿过迷雾中',
+      generating: '未来理想的你有些话想对现在迷茫的你说……',
+      generatingSub: '正在穿过迷雾',
       visualize: '面对未来的理想自己',
       choiceLead: '先选一个最接近的入口',
       placeholder: '没有合适的？写下你的真实想法...',
@@ -209,8 +299,8 @@ export const copy: Record<Language, Copy> = {
     timeCapsule: {
       eyebrow: '未来邮局',
       title: '把今天的迷雾寄给未来。',
-      description: 'AI 已经替你封好一封信。它不会现在打开，而会在未来某一天回到你手里，提醒你：你曾经从这里出发。',
-      deliveryPreview: '这封信会在 {date} 回到你的邮箱。',
+      description: 'AI 已经替你封好一封信，也留下了一张今天的画像。它们不会现在打开，而会在未来某一天回到你手里，提醒你：你曾经从这里出发。',
+      deliveryPreview: '这封信和今天的画像会在 {date} 回到你的邮箱。',
       emailLabel: '收信邮箱',
       emailPlaceholder: 'you@example.com',
       delays: {
@@ -228,6 +318,7 @@ export const copy: Record<Language, Copy> = {
     test: {
       profile: TEST_DATA.zh.profile,
       finalLetter: TEST_DATA.zh.finalLetter,
+      timeCapsuleLetter: TEST_DATA.zh.timeCapsuleLetter,
     },
   },
   en: {
@@ -299,11 +390,85 @@ export const copy: Record<Language, Copy> = {
       photoSubtitle: 'It stays in this experience. In test mode, you can use a simulated photo.',
       upload: 'Upload photo',
       useTestPhoto: 'Use test photo',
-      skipPhoto: 'Skip photo',
+      photoRequired: 'Please upload a photo before starting the conversation.',
       photoQuote: '"The image may be blurred. Honesty brings clarity."',
       start: 'Start the Conversation',
       privacyNote: 'Test mode does not call the real API or upload images.',
-      painPoints: ['Lost direction', 'Future anxiety', 'Repeated delay', 'Not knowing who I am', 'Trying hard but not arriving', 'Wanting to escape now', 'Feeling hollow'],
+      painLead: 'Which phrases feel closest to your current state?',
+      painHint: 'It does not need to be perfect. Just click the phrases that feel true.',
+      painSelectionCount: 'Selected {count}',
+      painPreviewDefaultTitle: 'Start from the doorway that feels most familiar',
+      painPreviewDefaultBody: 'Hover over a phrase to preview it, or tap one to keep it in focus. We will begin from what feels most true.',
+      painPointGroups: [
+        {
+          title: 'Self and inner state',
+          options: [
+            {
+              title: 'Feeling hollow',
+              preview: 'There is an emptiness in me, like nothing feels truly alive or worth moving toward.',
+            },
+            {
+              title: 'Wanting to escape now',
+              preview: 'I keep wanting to leave my current life, but I do not know where else I could go.',
+            },
+            {
+              title: 'Losing meaning',
+              preview: 'Life keeps moving, but I am less and less sure what any of it is for.',
+            },
+          ],
+        },
+        {
+          title: 'Choice and future',
+          options: [
+            {
+              title: 'Not arriving anywhere',
+              preview: 'I keep trying, but I still cannot find the feeling of truly landing somewhere solid.',
+            },
+            {
+              title: 'Decision paralysis',
+              preview: 'I am stuck at a fork in the road, so afraid of choosing wrong that I barely move.',
+            },
+            {
+              title: 'Losing direction',
+              preview: 'There seem to be many possible roads, but none of them clearly feels like mine.',
+            },
+          ],
+        },
+        {
+          title: 'Energy and action',
+          options: [
+            {
+              title: 'Delay and self-blame',
+              preview: 'The more I delay, the harder it is to act. The harder it is to act, the more I turn on myself.',
+            },
+            {
+              title: 'Low mental battery',
+              preview: 'It is not that I do not want to begin. I just feel like I have no energy left.',
+            },
+            {
+              title: 'Tired of trying',
+              preview: 'I have tested different possibilities and mostly found disappointment. I am tired of trying again.',
+            },
+          ],
+        },
+        {
+          title: 'Others and the world',
+          options: [
+            {
+              title: 'Peer pressure',
+              preview: 'Everyone around me seems to be moving forward, and I feel left behind.',
+            },
+            {
+              title: 'Not understood',
+              preview: 'I want to explain what hurts, but it feels like no one really gets it.',
+            },
+            {
+              title: 'Living by expectations',
+              preview: 'I keep trying to become what others expect, and I can feel myself fading out of the picture.',
+            },
+          ],
+        },
+      ],
     },
     chat: {
       exit: 'Exit',
@@ -329,8 +494,8 @@ export const copy: Record<Language, Copy> = {
     timeCapsule: {
       eyebrow: 'Future Mailbox',
       title: 'Send today’s fog into the future.',
-      description: 'AI has sealed a letter for you. It will not open now. It will return on a future day, reminding you: this is where you began.',
-      deliveryPreview: 'This letter will return to your inbox on {date}.',
+      description: 'AI has sealed a letter for you, along with a portrait of who you are today. They will return on a future day, reminding you: this is where you began.',
+      deliveryPreview: 'This letter and present portrait will return to your inbox on {date}.',
       emailLabel: 'Delivery email',
       emailPlaceholder: 'you@example.com',
       delays: {
@@ -348,6 +513,7 @@ export const copy: Record<Language, Copy> = {
     test: {
       profile: TEST_DATA.en.profile,
       finalLetter: TEST_DATA.en.finalLetter,
+      timeCapsuleLetter: TEST_DATA.en.timeCapsuleLetter,
     },
   },
 };

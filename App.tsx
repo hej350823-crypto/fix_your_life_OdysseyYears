@@ -15,17 +15,19 @@ import ResultDemo from './components/ResultDemo';
 import TimeCapsule from './components/TimeCapsule';
 import { t } from './i18n';
 
+const PROMPT_SETTINGS_STORAGE_KEY = 'fix-your-life.prompt-settings.v3';
+
 const App: React.FC = () => {
   const [viewState, setViewState] = useState<ViewState>(ViewState.LANDING);
   const [language, setLanguage] = useState<Language>('zh');
-  const [testMode, setTestMode] = useState(true);
+  const [testMode, setTestMode] = useState(false);
   const [promptSettings, setPromptSettings] = useState<PromptSettings>(DEFAULT_PROMPT_SETTINGS as PromptSettings);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [onboardingInitialName, setOnboardingInitialName] = useState('');
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('fix-your-life.prompt-settings');
+    const saved = window.localStorage.getItem(PROMPT_SETTINGS_STORAGE_KEY);
     if (!saved) return;
 
     try {
@@ -67,12 +69,12 @@ const App: React.FC = () => {
   const savePromptSettings = (settings: PromptSettings) => {
     const merged = mergePromptSettings(settings) as PromptSettings;
     setPromptSettings(merged);
-    window.localStorage.setItem('fix-your-life.prompt-settings', JSON.stringify(merged));
+    window.localStorage.setItem(PROMPT_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
   };
 
   const resetPromptSettings = () => {
     setPromptSettings(DEFAULT_PROMPT_SETTINGS as PromptSettings);
-    window.localStorage.removeItem('fix-your-life.prompt-settings');
+    window.localStorage.removeItem(PROMPT_SETTINGS_STORAGE_KEY);
   };
 
   const controls = (
@@ -125,6 +127,7 @@ const App: React.FC = () => {
         userName={userData.name}
         language={language}
         sealedLetter={result.timeCapsuleLetter}
+        imageUrl={result.timeCapsuleImageUrl}
         onBack={() => setViewState(ViewState.RESULT)}
         onRestart={() => setViewState(ViewState.LANDING)}
       />

@@ -18,9 +18,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
   const [loadedTestProfile, setLoadedTestProfile] = useState(false);
   const [shake, setShake] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
+  const [focusedPoint, setFocusedPoint] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const text = t(language).onboarding;
   const testProfile = t(language).test.profile;
+  const allPainPointOptions = text.painPointGroups.flatMap((group) => group.options);
+  const previewPoint = allPainPointOptions.find((option) => option.title === (hoveredPoint || focusedPoint)) || null;
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +38,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
 
   const togglePoint = (point: string) => {
     setSelectedPoints((prev) =>
-      prev.includes(point) ? prev.filter((p) => p !== point) : [...prev, point],
+      prev.includes(point)
+        ? prev.filter((p) => p !== point)
+        : [...prev, point],
     );
+    setFocusedPoint(point);
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,6 +55,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
   };
 
   const handleFinalize = () => {
+    if (!photo) {
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+
     setIsFadingOut(true);
     setTimeout(() => {
       onComplete({
@@ -65,6 +78,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
     setSelectedPoints(testProfile.painPoints);
     setPhoto(testProfile.photo);
     setLoadedTestProfile(true);
+    setFocusedPoint(testProfile.painPoints[0] || null);
   };
 
   const progressWidth = step === 0 ? '33%' : step === 1 ? '66%' : '100%';
@@ -132,42 +146,65 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
         )}
 
         {step === 1 && (
-          <div className="flex flex-col items-center text-center space-y-12 animate-fade-in-up">
+          <div className="flex flex-col items-center text-center space-y-4 animate-fade-in-up">
             <div className="space-y-4">
               <h2 className="font-serif text-4xl md:text-5xl text-charcoal">
                 {text.hello}, {name}.
               </h2>
-              <p className="font-serif text-2xl text-stone-500 italic">
-                {text.painQuestion}
-              </p>
+              <div className="space-y-10">
+                <p className="font-serif text-2xl text-stone-500 not-italic">
+                  {text.painQuestion}
+                </p>
+                <div className="min-h-[48px]">
+                  {previewPoint && (
+                    <p className="mx-auto max-w-3xl text-base leading-7 text-stone-500 transition-all duration-300">
+                      “{previewPoint.preview}”
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-4 max-w-2xl">
-              {text.painPoints.map((point) => {
-                const isSelected = selectedPoints.includes(point);
-                return (
-                  <button
-                    key={point}
-                    onClick={() => togglePoint(point)}
-                    className={`px-6 py-3 rounded-full text-lg transition-all duration-300 transform hover:-translate-y-1 ${
-                      isSelected
-                        ? 'bg-orange-100 text-charcoal shadow-md scale-105 border border-orange-200'
-                        : 'bg-white text-stone-500 border border-stone-100 hover:border-stone-300'
-                    }`}
-                  >
-                    {point}
-                  </button>
-                );
-              })}
+            <div className="w-full max-w-5xl grid gap-x-8 gap-y-4 md:grid-cols-2">
+              {text.painPointGroups.map((group) => (
+                <div key={group.title} className="space-y-3">
+                  <div className="text-center text-[11px] uppercase tracking-[0.24em] text-stone-300">
+                    {group.title}
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {group.options.map((point) => {
+                      const isSelected = selectedPoints.includes(point.title);
+                      return (
+                        <button
+                          key={point.title}
+                          type="button"
+                          onClick={() => togglePoint(point.title)}
+                          onMouseEnter={() => setHoveredPoint(point.title)}
+                          onMouseLeave={() => setHoveredPoint(null)}
+                          className={`px-5 py-2.5 rounded-full text-base md:text-lg transition-all duration-300 transform ${
+                            isSelected
+                              ? 'bg-orange-100 text-charcoal shadow-md scale-105 border border-orange-200'
+                              : 'bg-white text-stone-500 border border-stone-100 hover:-translate-y-1 hover:border-stone-300'
+                          }`}
+                        >
+                          {point.title}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <button
-              onClick={() => setStep(2)}
-              disabled={selectedPoints.length === 0}
-              className="mt-8 px-10 py-4 bg-charcoal text-white rounded-full text-lg font-medium tracking-wide shadow-lg hover:bg-black hover:shadow-orange-200/50 transition-all disabled:opacity-0 disabled:translate-y-4"
-            >
-              {text.continue}
-            </button>
+            <div className="pt-8">
+              <button
+                onClick={() => setStep(2)}
+                disabled={selectedPoints.length === 0}
+                className="px-10 py-4 bg-charcoal text-white rounded-full text-lg font-medium tracking-wide shadow-lg hover:bg-black hover:shadow-orange-200/50 transition-all disabled:opacity-0 disabled:translate-y-4"
+              >
+                {text.continue}
+              </button>
+            </div>
           </div>
         )}
 
@@ -220,8 +257,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
 
             <div className="min-h-12 flex items-center justify-center">
               <div className="animate-fade-in-up space-y-6">
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  {testMode && (
+                {testMode && (
+                  <div className="flex flex-wrap items-center justify-center gap-3">
                     <button
                       onClick={() => {
                         setPhoto(testProfile.photo);
@@ -231,14 +268,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                     >
                       {text.useTestPhoto}
                     </button>
-                  )}
-                  <button
-                    onClick={() => setPhoto(null)}
-                    className="rounded-full border border-stone-200 bg-white px-5 py-2 text-sm text-stone-500 shadow-sm hover:border-stone-300 hover:text-charcoal"
-                  >
-                    {text.skipPhoto}
-                  </button>
-                </div>
+                  </div>
+                )}
 
                 {photo && (
                   <>
@@ -254,12 +285,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                   </>
                 )}
                 {!photo && (
-                  <button
-                    onClick={handleFinalize}
-                    className="px-12 py-4 bg-charcoal text-white rounded-full text-lg font-medium shadow-lg hover:bg-black transition-all"
-                  >
-                    {text.start}
-                  </button>
+                  <p className={`font-sans text-sm transition-colors ${shake ? 'text-red-400' : 'text-stone-400'}`}>
+                    {text.photoRequired}
+                  </p>
                 )}
               </div>
             </div>

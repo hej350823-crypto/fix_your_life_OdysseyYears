@@ -126,7 +126,7 @@ const Hero: React.FC<HeroProps> = ({ language, setViewState }) => {
         </h1>
 
         <div className="space-y-6">
-          <h2 className="font-serif text-2xl md:text-4xl text-stone-600 italic">
+          <h2 className="font-serif text-2xl md:text-4xl text-stone-600 not-italic">
             {text.subtitle}
           </h2>
           <p className="font-sans text-stone-500 text-base md:text-lg max-w-xl mx-auto font-light leading-relaxed">
@@ -148,11 +148,8 @@ const Hero: React.FC<HeroProps> = ({ language, setViewState }) => {
 
       </div>
 
-      <nav className="absolute top-0 left-0 right-0 p-8 flex justify-between items-center z-20">
+      <nav className="absolute top-0 left-0 right-0 p-8 flex items-center z-20">
         <div className="w-8 h-8 rounded-full bg-charcoal/10" />
-        <div className="text-xs font-sans text-stone-400 tracking-[0.2em] uppercase">
-          {text.eyebrow}
-        </div>
       </nav>
     </section>
   );

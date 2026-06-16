@@ -1,4 +1,4 @@
-import { Language, Message, PromptSettings, UserData } from '../types';
+import { Language, Message, PromptSettings, UserData, UserPersonaProfile } from '../types';
 import { getTestData } from '../mock/testData';
 
 export interface ChatResponse {
@@ -13,7 +13,28 @@ export interface ChatSession {
   sendMessage: (msg: string) => Promise<ChatResponse>;
 }
 
+type ApiErrorResponse = {
+  error?: string;
+  hint?: string | null;
+  errorType?: string | null;
+  provider?: string | null;
+  baseUrl?: string | null;
+  upstreamStatus?: number | null;
+};
+
 const fallbackImage = '/test-assets/future-self.svg';
+const MAX_CHAT_TURNS = 6;
+
+const formatApiErrorMessage = (detail: ApiErrorResponse | null, status: number) => {
+  const headline = detail?.error || `AI API request failed: ${status}`;
+  const extras = [
+    detail?.errorType ? `类型：${detail.errorType}` : '',
+    detail?.provider ? `提供方：${detail.provider}` : '',
+    detail?.hint ? `提示：${detail.hint}` : '',
+  ].filter(Boolean);
+
+  return extras.length > 0 ? `${headline}。${extras.join('；')}` : headline;
+};
 
 const postAiAction = async <TResponse>(action: string, payload: Record<string, unknown>): Promise<TResponse> => {
   const response = await fetch('/api/gemini', {
@@ -28,14 +49,15 @@ const postAiAction = async <TResponse>(action: string, payload: Record<string, u
   });
 
   if (!response.ok) {
-    throw new Error(`AI API request failed: ${response.status}`);
+    const detail = await response.json().catch(() => null) as ApiErrorResponse | null;
+    throw new Error(formatApiErrorMessage(detail, response.status));
   }
 
   return response.json() as Promise<TResponse>;
 };
 
 const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
-  const currentTurn = Math.min(Math.max(turn, 1), 10);
+  const currentTurn = Math.min(Math.max(turn, 1), MAX_CHAT_TURNS);
   const language = userData.language || 'zh';
   const demoQuestions = getTestData(language).demoQuestions;
   const name = userData.name;
@@ -57,7 +79,7 @@ const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
     text: language === 'zh'
       ? `(演示模式) ${name}，我听见了。${demoQuestions[currentTurn - 1]}`
       : `(Demo mode) I hear you, ${name}. ${demoQuestions[currentTurn - 1]}`,
-    suggestions: currentTurn >= 10
+    suggestions: currentTurn >= MAX_CHAT_TURNS
       ? [language === 'zh' ? '面对未来的理想自己' : 'Meet your ideal future self']
       : demoSuggestions,
     visual_tags: ['warm portrait', 'quiet confidence', 'soft morning light'],
@@ -71,7 +93,19 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
 
   return {
     sendMessage: async (msg: string) => {
-      const nextDemoTurn = Math.min(localTurn + 1, 10);
+      const nextDemoTurn = Math.min(localTurn + 1, MAX_CHAT_TURNS);
+
+      if (userData.isTestMode) {
+        localTurn = nextDemoTurn;
+        const response = createDemoResponse(userData, localTurn);
+
+        if (!msg.startsWith('(System:')) {
+          history.push({ sender: 'user', text: msg });
+        }
+        history.push({ sender: 'ai', text: response.text });
+
+        return response;
+      }
 
       try {
         const response = await postAiAction<ChatResponse>('chat', {
@@ -91,7 +125,18 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
 
         return response;
       } catch (e) {
-        console.warn('Using local demo response because /api/gemini is unavailable.', e);
+        console.warn('/api/gemini is unavailable.', e);
+
+        if (!userData.isTestMode) {
+          return {
+            text: userData.language === 'zh'
+              ? `真实 AI API 还没有跑通：${e instanceof Error ? e.message : '未知错误'}。请先检查 VPN / 代理 / 网络出口，或者打开测试模式体验演示流程。`
+              : `The real AI API is not working yet: ${e instanceof Error ? e.message : 'Unknown error'}. Check VPN / proxy / network access first, or turn on test mode for the demo flow.`,
+            suggestions: [],
+            current_turn: localTurn,
+          };
+        }
+
         localTurn = nextDemoTurn;
         const response = createDemoResponse(userData, localTurn);
 
@@ -106,22 +151,79 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
   };
 };
 
-export const generateFutureSelfPortrait = async (userName: string, collectedTags: string[] = [], promptSettings?: PromptSettings): Promise<string> => {
+export const generateFutureSelfPortrait = async (
+  userName: string,
+  collectedTags: string[] = [],
+  promptSettings?: PromptSettings,
+  userPhoto?: string | null,
+  personaProfile?: UserPersonaProfile,
+): Promise<string> => {
   try {
     const response = await postAiAction<{ imageUrl: string }>('future-portrait', {
       userName,
       collectedTags,
       promptSettings,
+      userPhoto,
+      personaProfile,
     });
 
     return response.imageUrl || fallbackImage;
   } catch (e) {
-    console.warn('Using fallback portrait because /api/gemini is unavailable.', e);
-    return fallbackImage;
+    console.warn('/api/gemini future portrait is unavailable.', e);
+    throw e;
   }
 };
 
-export const generateFinalLetter = async (userName: string, chatHistorySummary: string, language: Language = 'zh', promptSettings?: PromptSettings): Promise<string> => {
+export const generateCurrentSelfPortrait = async (
+  userName: string,
+  personaProfile?: UserPersonaProfile,
+  promptSettings?: PromptSettings,
+  userPhoto?: string | null,
+): Promise<string> => {
+  try {
+    const response = await postAiAction<{ imageUrl: string }>('current-portrait', {
+      userName,
+      personaProfile,
+      promptSettings,
+      userPhoto,
+    });
+
+    return response.imageUrl || fallbackImage;
+  } catch (e) {
+    console.warn('/api/gemini current portrait is unavailable.', e);
+    throw e;
+  }
+};
+
+export const generateUserPersonaProfile = async (
+  userData: UserData,
+  chatHistorySummary: string,
+  language: Language = 'zh',
+  promptSettings?: PromptSettings,
+): Promise<UserPersonaProfile> => {
+  try {
+    const response = await postAiAction<{ personaProfile: UserPersonaProfile }>('user-persona', {
+      userData,
+      chatHistorySummary,
+      language,
+      promptSettings,
+      isTestMode: userData.isTestMode,
+    });
+
+    return response.personaProfile || {};
+  } catch (e) {
+    console.warn('/api/gemini user persona is unavailable.', e);
+    throw e;
+  }
+};
+
+export const generateFinalLetter = async (
+  userName: string,
+  chatHistorySummary: string,
+  language: Language = 'zh',
+  promptSettings?: PromptSettings,
+  personaProfile?: UserPersonaProfile,
+): Promise<string> => {
   const fallbackLetter = getTestData(language).fallbackLetter(userName);
 
   try {
@@ -130,16 +232,23 @@ export const generateFinalLetter = async (userName: string, chatHistorySummary: 
       chatHistorySummary,
       language,
       promptSettings,
+      personaProfile,
     });
 
     return response.letter || fallbackLetter;
   } catch (e) {
-    console.warn('Using fallback letter because /api/gemini is unavailable.', e);
-    return fallbackLetter;
+    console.warn('/api/gemini final letter is unavailable.', e);
+    throw e;
   }
 };
 
-export const generateTimeCapsuleLetter = async (userName: string, chatHistorySummary: string, language: Language = 'zh', promptSettings?: PromptSettings): Promise<string> => {
+export const generateTimeCapsuleLetter = async (
+  userName: string,
+  chatHistorySummary: string,
+  language: Language = 'zh',
+  promptSettings?: PromptSettings,
+  personaProfile?: UserPersonaProfile,
+): Promise<string> => {
   const fallbackLetter = getTestData(language).fallbackTimeCapsuleLetter(userName);
 
   try {
@@ -148,11 +257,12 @@ export const generateTimeCapsuleLetter = async (userName: string, chatHistorySum
       chatHistorySummary,
       language,
       promptSettings,
+      personaProfile,
     });
 
     return response.letter || fallbackLetter;
   } catch (e) {
-    console.warn('Using fallback time capsule letter because /api/gemini is unavailable.', e);
-    return fallbackLetter;
+    console.warn('/api/gemini time capsule letter is unavailable.', e);
+    throw e;
   }
 };

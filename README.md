@@ -49,24 +49,25 @@ Deploy this project as a standalone web app. On Vercel:
 
 1. Import this repository.
 2. Set the project root to this folder if it lives inside a larger repo.
-3. Add the environment variables `ARK_API_KEY`, `ARK_TEXT_MODEL`, and `ARK_IMAGE_MODEL`.
+3. Add the environment variables `DEEPSEEK_API_KEY` and `ARK_IMAGE_MODEL` or `DOUBAO_IMAGE_MODEL`.
 4. Deploy.
 
-The production frontend calls `/api/gemini`. That server-side function prefers Volcengine Ark for both DeepSeek text generation and Doubao future portrait images when Ark credentials are configured. It can also fall back to the official DeepSeek API if `DEEPSEEK_API_KEY` is configured without `ARK_TEXT_MODEL`.
+The production frontend calls `/api/gemini`. That server-side function prefers the direct DeepSeek API for text generation when `DEEPSEEK_API_KEY` is configured. If DeepSeek is not configured, it can fall back to Volcengine Ark for text generation when `ARK_API_KEY` and `ARK_TEXT_MODEL` are present. Portrait images still use the Volcengine Ark / Doubao image API.
 
 ## Environment Variables
 
 
 | Name                 | Required                        | Where Used                                             |
 | -------------------- | ------------------------------- | ------------------------------------------------------ |
-| `DEEPSEEK_API_KEY`   | Optional                        | Only needed when calling DeepSeek directly             |
+| `DEEPSEEK_API_KEY`   | Yes for DeepSeek text and letters | Direct DeepSeek chat completions                      |
 | `DEEPSEEK_MODEL`     | Optional                        | Defaults to `deepseek-v4-flash` for direct DeepSeek    |
-| `ARK_API_KEY`        | Yes for Ark text and images     | Server-side API route only                             |
-| `ARK_TEXT_MODEL`     | Yes for Ark text responses      | Your Ark DeepSeek model ID                             |
+| `ARK_API_KEY`        | Optional for Ark text fallback  | Server-side API route only                             |
+| `ARK_TEXT_MODEL`     | Optional for Ark text fallback  | Your Ark DeepSeek model ID                             |
 | `ARK_TEXT_BASE_URL`  | Optional                        | Defaults to `https://ark.cn-beijing.volces.com/api/v3` |
-| `ARK_IMAGE_MODEL`    | Yes for real AI portrait images | Your Volcengine Ark / Doubao image model ID            |
+| `ARK_IMAGE_MODEL` / `DOUBAO_IMAGE_MODEL` | Yes for real AI portrait images | Your Volcengine Ark / Doubao image model ID            |
 | `ARK_IMAGE_BASE_URL` | Optional                        | Defaults to `https://ark.cn-beijing.volces.com/api/v3` |
-| `ARK_IMAGE_SIZE`     | Optional                        | Defaults to `1024x1536`                                |
+| `ARK_IMAGE_SIZE`     | Optional                        | Defaults to `2K`                                       |
+| `ARK_IMAGE_OUTPUT_FORMAT` | Optional                    | Defaults to `png`                                      |
 
 
 ## Scripts

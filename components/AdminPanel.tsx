@@ -11,11 +11,12 @@ interface AdminPanelProps {
 }
 
 const promptFields: Array<{ key: keyof PromptSettings; zh: string; en: string; rows: number }> = [
-  { key: 'futureSelfRole', zh: '未来自我角色设定', en: 'Future-self role', rows: 4 },
-  { key: 'conversationProtocol', zh: '10 轮对话协议', en: 'Conversation protocol', rows: 7 },
-  { key: 'responseRules', zh: '回复规则', en: 'Response rules', rows: 6 },
-  { key: 'imagePrompt', zh: '未来画像提示词', en: 'Future portrait prompt', rows: 6 },
-  { key: 'letterPrompt', zh: '未来信件提示词', en: 'Future letter prompt', rows: 5 },
+  { key: 'chatSystemPrompt', zh: '聊天主提示词', en: 'Chat system prompt', rows: 24 },
+  { key: 'userPersonaPrompt', zh: '用户画像提示词', en: 'User persona prompt', rows: 24 },
+  { key: 'imagePrompt', zh: '未来画像提示词', en: 'Future portrait prompt', rows: 10 },
+  { key: 'currentImagePrompt', zh: '时间胶囊当前画像提示词', en: 'Time capsule current portrait prompt', rows: 10 },
+  { key: 'letterPrompt', zh: '未来信件提示词', en: 'Future letter prompt', rows: 10 },
+  { key: 'timeCapsulePrompt', zh: '时间胶囊提示词', en: 'Time capsule prompt', rows: 12 },
 ];
 
 const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -45,6 +46,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const saveDraft = () => {
     onSave(draft);
     setStatus(isZh ? '已保存到当前浏览器' : 'Saved in this browser');
+  };
+
+  const copyPrompt = async (key: keyof PromptSettings) => {
+    try {
+      await navigator.clipboard.writeText(draft[key]);
+      setStatus(isZh ? '已复制提示词' : 'Prompt copied');
+    } catch (e) {
+      console.warn('Prompt could not be copied.', e);
+      setStatus(isZh ? '复制失败，请手动选中文本复制' : 'Copy failed. Select the text manually.');
+    }
   };
 
   return (
@@ -80,8 +91,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             <h2 className="font-serif text-xl">{isZh ? '现在能做什么' : 'What this controls'}</h2>
             <p className="mt-3 text-sm leading-6 text-stone-500">
               {isZh
-                ? '这里先不加密码。你可以调整对话人格、10 轮流程、图片提示词和信件提示词。配置会保存在当前浏览器，下一次真实 API 调用会带给后端。'
-                : 'No password yet. You can tune the dialogue persona, 10-turn flow, image prompt, and letter prompt. Settings are saved in this browser and sent with future API calls.'}
+                ? '这里先不加密码。你可以直接调整聊天主提示词、用户画像提示词、未来/当前图片提示词、未来信提示词和时间胶囊提示词。配置会保存在当前浏览器，下一次真实 API 调用会带给后端。'
+                : 'No password yet. You can tune the chat system prompt, user persona prompt, future/current image prompts, future letter prompt, and time capsule prompt. Settings are saved in this browser and sent with future API calls.'}
             </p>
           </div>
 
@@ -107,17 +118,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         <div className="space-y-5">
           {promptFields.map((field) => (
-            <label key={field.key} className="block rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
-              <span className="text-sm font-semibold text-stone-700">
-                {isZh ? field.zh : field.en}
-              </span>
+            <section key={field.key} className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-sm font-semibold text-stone-700">
+                  {isZh ? field.zh : field.en}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => copyPrompt(field.key)}
+                  className="rounded-full border border-stone-200 bg-white px-4 py-1.5 text-xs font-medium text-stone-500 transition hover:border-orange-200 hover:text-charcoal"
+                >
+                  {isZh ? '复制' : 'Copy'}
+                </button>
+              </div>
               <textarea
                 value={draft[field.key]}
                 onChange={(event) => updateField(field.key, event.target.value)}
                 rows={field.rows}
-                className="mt-3 w-full resize-y rounded-lg border border-stone-200 bg-stone-50 p-4 font-mono text-sm leading-6 text-stone-700 outline-none transition focus:border-orange-200 focus:bg-white focus:ring-2 focus:ring-orange-100"
+                spellCheck={false}
+                className="mt-4 w-full resize-y rounded-lg border border-stone-200 bg-white px-5 py-4 font-mono text-sm leading-7 text-stone-700 shadow-inner outline-none transition focus:border-orange-200 focus:ring-2 focus:ring-orange-100"
               />
-            </label>
+            </section>
           ))}
         </div>
       </section>

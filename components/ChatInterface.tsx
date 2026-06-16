@@ -1,7 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createChatSession, ChatSession, generateFinalLetter, generateFutureSelfPortrait, generateTimeCapsuleLetter } from '../services/geminiService';
+import {
+  createChatSession,
+  ChatSession,
+  generateCurrentSelfPortrait,
+  generateFinalLetter,
+  generateFutureSelfPortrait,
+  generateTimeCapsuleLetter,
+  generateUserPersonaProfile,
+} from '../services/geminiService';
 import { t } from '../i18n';
 import { ConversationStage, GenerationResult, Language, Message, PromptSettings, UserData } from '../types';
+
+const MAX_CHAT_TURNS = 6;
 
 interface ChatInterfaceProps {
   userData: UserData;
@@ -13,8 +23,8 @@ interface ChatInterfaceProps {
 }
 
 const conversationStageByTurn = (turnCount: number): ConversationStage => {
-  if (turnCount <= 3) return 'anti-vision';
-  if (turnCount <= 7) return 'shift';
+  if (turnCount <= 2) return 'anti-vision';
+  if (turnCount <= 4) return 'shift';
   return 'ideal';
 };
 
@@ -28,6 +38,18 @@ const inputFadeByStage: Record<ConversationStage, string> = {
   'anti-vision': 'from-stone-50/92 via-stone-50/70',
   shift: 'from-rose-50/90 via-orange-50/64',
   ideal: 'from-orange-50/88 via-amber-50/62',
+};
+
+const collectVisualTags = (tags: unknown, target: Set<string>) => {
+  if (!Array.isArray(tags)) return;
+  tags
+    .filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0)
+    .forEach((tag) => target.add(tag));
+};
+
+const getPersonaVisualTags = (tags: unknown): string[] => {
+  if (!Array.isArray(tags)) return [];
+  return tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0);
 };
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testMode, promptSettings, onBack, onComplete }) => {
@@ -57,7 +79,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
 
       setMessages([{ sender: 'ai', text: welcomeData.text, audioBase64: welcomeData.audioBase64 }]);
       setCurrentSuggestions(welcomeData.suggestions || []);
-      welcomeData.visual_tags?.forEach((tag) => collectedTagsRef.current.add(tag));
+      collectVisualTags(welcomeData.visual_tags, collectedTagsRef.current);
       setTurnCount(welcomeData.current_turn || 1);
       setIsTyping(false);
     };
@@ -75,7 +97,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   useEffect(() => {
     setStage(conversationStageByTurn(turnCount));
 
-    const progress = Math.min(turnCount / 10, 1);
+    const progress = Math.min(turnCount / MAX_CHAT_TURNS, 1);
     setBlurLevel(Math.max(0, 30 - progress * 30));
   }, [turnCount]);
 
@@ -90,7 +112,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
 
     const response = await chatSession.current.sendMessage(textToSend);
 
-    response.visual_tags?.forEach((tag) => collectedTagsRef.current.add(tag));
+    collectVisualTags(response.visual_tags, collectedTagsRef.current);
     setTurnCount(response.current_turn || turnCount + 1);
     setMessages((prev) => [...prev, { sender: 'ai', text: response.text, audioBase64: response.audioBase64 }]);
     setCurrentSuggestions(response.suggestions || []);
@@ -99,28 +121,56 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
 
   const handleVisualize = async () => {
     setIsGenerating(true);
-    const conversationSummary = messages.map((m) => `${m.sender}: ${m.text}`).join('\n').slice(-2000);
-    const tagsArray = Array.from(collectedTagsRef.current);
-    const letter = testMode || userData.isTestMode
-      ? testCopy.finalLetter
-      : await generateFinalLetter(userData.name, conversationSummary, language, promptSettings);
-    const timeCapsuleLetter = testMode || userData.isTestMode
-      ? testCopy.timeCapsuleLetter
-      : await generateTimeCapsuleLetter(userData.name, conversationSummary, language, promptSettings);
-    const imageUrl = testMode || userData.isTestMode
-      ? '/test-assets/future-self.svg'
-      : await generateFutureSelfPortrait(userData.name, tagsArray, promptSettings);
-    onComplete({ imageUrl, letter, timeCapsuleLetter });
-    setIsGenerating(false);
+    try {
+      const conversationSummary = messages.map((m) => `${m.sender}: ${m.text}`).join('\n').slice(-2000);
+      const tagsArray: string[] = Array.from(collectedTagsRef.current);
+
+      if (testMode || userData.isTestMode) {
+        onComplete({
+          imageUrl: '/test-assets/future-self.svg',
+          timeCapsuleImageUrl: '/test-assets/current-self.svg',
+          letter: testCopy.finalLetter,
+          timeCapsuleLetter: testCopy.timeCapsuleLetter,
+        });
+        return;
+      }
+
+      const personaProfile = await generateUserPersonaProfile(userData, conversationSummary, language, promptSettings);
+      const enrichedTags = [
+        ...tagsArray,
+        ...getPersonaVisualTags(personaProfile.future_persona?.visual_tags_en),
+      ];
+
+      const [letter, timeCapsuleLetter, imageUrl, timeCapsuleImageUrl] = await Promise.all([
+        generateFinalLetter(userData.name, conversationSummary, language, promptSettings, personaProfile),
+        generateTimeCapsuleLetter(userData.name, conversationSummary, language, promptSettings, personaProfile),
+        generateFutureSelfPortrait(userData.name, enrichedTags, promptSettings, userData.photo, personaProfile),
+        generateCurrentSelfPortrait(userData.name, personaProfile, promptSettings, userData.photo),
+      ]);
+
+      onComplete({ imageUrl, timeCapsuleImageUrl, letter, timeCapsuleLetter, personaProfile });
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: language === 'zh'
+            ? `真实 AI 结果还没有生成成功：${error instanceof Error ? error.message : '未知错误'}。请先检查 VPN / 代理 / 网络出口，或打开测试模式体验完整流程。`
+            : `The real AI result could not be generated yet: ${error instanceof Error ? error.message : 'Unknown error'}. Check VPN / proxy / network access first, or turn on test mode to try the full flow.`,
+        },
+      ]);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const getSunRingDash = () => {
     const totalCircumference = 2 * Math.PI * 48;
-    const progress = Math.min(turnCount / 10, 1);
+    const progress = Math.min(turnCount / MAX_CHAT_TURNS, 1);
     return `${progress * totalCircumference} ${totalCircumference}`;
   };
 
-  const isReadyForPortrait = turnCount >= 10;
+  const isReadyForPortrait = turnCount >= MAX_CHAT_TURNS;
 
   if (isGenerating) {
     return (
