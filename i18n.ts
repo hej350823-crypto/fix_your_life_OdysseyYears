@@ -101,17 +101,18 @@ type Copy = {
   };
   timeCapsule: {
     eyebrow: string;
+    previewNotice: string;
     title: string;
     description: string;
     deliveryPreview: string;
     emailLabel: string;
     emailPlaceholder: string;
-    delays: {
-      oneMonth: string;
-      threeMonths: string;
-      sixMonths: string;
-      oneYear: string;
-    };
+      delays: {
+        threeDays: string;
+        oneWeek: string;
+        twoWeeks: string;
+        oneMonth: string;
+      };
     submit: string;
     saving: string;
     saved: string;
@@ -298,22 +299,23 @@ export const copy: Record<Language, Copy> = {
     },
     timeCapsule: {
       eyebrow: '未来邮局',
+      previewNotice: '时间胶囊邮箱发送功能暂未开放，后续版本会支持寄送到未来的自己。',
       title: '把今天的迷雾寄给未来。',
-      description: 'AI 已经替你封好一封信，也留下了一张今天的画像。它们不会现在打开，而会在未来某一天回到你手里，提醒你：你曾经从这里出发。',
+      description: '填好邮箱后，我们会把今天的信和画像一起封存起来。它们不会现在打开，而会在未来某一天回到你手里，提醒你：你曾经从这里出发。',
       deliveryPreview: '这封信和今天的画像会在 {date} 回到你的邮箱。',
       emailLabel: '收信邮箱',
       emailPlaceholder: 'you@example.com',
       delays: {
-        oneMonth: '1 个月后',
-        threeMonths: '3 个月后',
-        sixMonths: '6 个月后',
-        oneYear: '1 年后',
+        threeDays: '3 天后',
+        oneWeek: '7 天后',
+        twoWeeks: '14 天后',
+        oneMonth: '30 天后',
       },
       submit: '寄给未来',
-      saving: '正在封存',
-      saved: '已经封存。当前为测试保存，接入邮件服务后会按时发送。',
-      error: '暂时没能保存，请稍后再试。',
-      privacy: '测试阶段会先保存为本地记录；上线后会加数据库、邮件服务和退订入口。',
+      saving: '正在生成并封存',
+      saved: '已经封存。邮件已预约，会按你选的日期自动发出。',
+      error: '暂时没能预约发送，请稍后再试。',
+      privacy: '当前版本使用 Resend 定时发送，最长支持预约 30 天内的邮件。',
     },
     test: {
       profile: TEST_DATA.zh.profile,
@@ -493,22 +495,23 @@ export const copy: Record<Language, Copy> = {
     },
     timeCapsule: {
       eyebrow: 'Future Mailbox',
+      previewNotice: 'Time-capsule email delivery is not live yet. A future release will let you send this to your future self.',
       title: 'Send today’s fog into the future.',
-      description: 'AI has sealed a letter for you, along with a portrait of who you are today. They will return on a future day, reminding you: this is where you began.',
+      description: 'After you enter your email, we will seal today’s letter and portrait together. They will return on a future day, reminding you: this is where you began.',
       deliveryPreview: 'This letter and present portrait will return to your inbox on {date}.',
       emailLabel: 'Delivery email',
       emailPlaceholder: 'you@example.com',
       delays: {
-        oneMonth: 'In 1 month',
-        threeMonths: 'In 3 months',
-        sixMonths: 'In 6 months',
-        oneYear: 'In 1 year',
+        threeDays: 'In 3 days',
+        oneWeek: 'In 7 days',
+        twoWeeks: 'In 14 days',
+        oneMonth: 'In 30 days',
       },
       submit: 'Send to the Future',
-      saving: 'Sealing',
-      saved: 'Sealed. This is stored as a test record for now; email delivery can be connected later.',
-      error: 'Could not save it yet. Please try again later.',
-      privacy: 'During testing this is saved locally. Before launch, add database storage, email delivery, and unsubscribe controls.',
+      saving: 'Generating and sealing',
+      saved: 'Sealed. Your email has been scheduled and will send automatically on that date.',
+      error: 'Could not schedule it yet. Please try again later.',
+      privacy: 'This version uses Resend scheduled email and currently supports delivery within 30 days.',
     },
     test: {
       profile: TEST_DATA.en.profile,

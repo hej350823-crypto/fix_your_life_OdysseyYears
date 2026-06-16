@@ -62,13 +62,12 @@ export interface UserPersonaProfile {
 
 export interface GenerationResult {
   imageUrl: string;
-  timeCapsuleImageUrl: string;
   letter: string;
-  timeCapsuleLetter: string;
+  conversationSummary: string;
   personaProfile?: UserPersonaProfile;
 }
 
-export type TimeCapsuleDelay = 'oneMonth' | 'threeMonths' | 'sixMonths' | 'oneYear';
+export type TimeCapsuleDelay = 'threeDays' | 'oneWeek' | 'twoWeeks' | 'oneMonth';
 
 export interface TimeCapsulePayload {
   userName: string;

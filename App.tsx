@@ -126,8 +126,11 @@ const App: React.FC = () => {
       <TimeCapsule
         userName={userData.name}
         language={language}
-        sealedLetter={result.timeCapsuleLetter}
-        imageUrl={result.timeCapsuleImageUrl}
+        conversationSummary={result.conversationSummary}
+        personaProfile={result.personaProfile}
+        promptSettings={promptSettings}
+        userPhoto={userData.photo}
+        isTestMode={testMode || userData.isTestMode}
         onBack={() => setViewState(ViewState.RESULT)}
         onRestart={() => setViewState(ViewState.LANDING)}
       />

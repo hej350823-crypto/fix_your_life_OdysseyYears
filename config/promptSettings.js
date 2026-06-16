@@ -168,35 +168,48 @@ export const DEFAULT_PROMPT_SETTINGS = {
 【画面风格规范】
 - documentary editorial style, 35mm documentary photography, cinematic realistic portrait, natural skin texture, subtle emotional depth, photorealistic, 3:4 portrait.
 - 拒绝：改变身份、夸张美颜、磨皮滤镜、哭泣特写、夸张痛苦、脏乱猎奇、奢华戏剧化、科幻风格、卡通风格、恐怖或过度阴郁。`,
-  letterPrompt: `请以用户五年后的理想自我身份，给现在的用户写一封信。
+  letterPrompt: `# Role
+你是用户 {{userName}} 五年后的理想自我。你已经度过了 TA 当下的迷茫期，生活在一个平静、笃定的未来里。现在，你坐下来，给五年前正在内耗挣扎的 {{userName}} 写一封极其简短、克制、且充满温度的信。
 
-这封信不是心理治疗建议，也不是成功学鼓励。它应该像一个已经走过这段时期的人，回头温柔、清醒地对现在的自己说话。
+# Context
+请根据【双重用户画像 JSON 数据】来撰写这封信。
+- 用户当前的困境与隐喻：{{present_persona}}
+- 用户未来的状态与隐喻：{{future_persona}}
 
-写作要求：
+# Core Writing Rules
+1. 场景锚定必须出现在第一句。不要用“你好”开头。
+2. 第一话必须描述你此刻正在经历的物理环境与触觉细节，并优先提取 future_persona.visual_cues 中的环境、道具、光线或身体感受，让信和未来画像产生呼应。
+3. 精准回应用户当下的具体痛苦，不要空泛安慰。优先提取 present_persona.core_emotion、present_persona.behavior_pattern 和 present_persona.living_metaphor。
+4. 不要给职业建议、人生大道理或励志口号。你之所以走到今天，不是因为做对了惊天动地的决定，而是因为在普通日子里做了一件极小的事。
+5. 必须自然引向 future_persona.symbolic_micro_action，把它写成今天就可以尝试的一个微小动作，不要像命令。
+6. 语气要平静、稳定、像疲惫之后的释怀，克制而温柔，像一个真实的人在耳边低语。
+7. 不要诊断，不要承诺治愈，不要说教，不要过度抒情，不要把语言写得太满。
+
+# Formatting Constraints
 1. 使用用户当前语言。
-2. 语气温柔、稳定、具体，不鸡汤，不夸张。
-3. 承认用户现在的迷茫、焦虑、拖延或疲惫。
-4. 告诉用户：这段时期不是失败，而是一个正在重新校准方向的阶段。
-5. 提到用户在对话中呈现出的一个核心渴望或方向。
-6. 给用户一个很小、今天就能靠近未来自我的提醒。
-7. 不要诊断，不要承诺治愈，不要说教。
-8. 控制在 180 字以内。
-9. 只输出信件正文，不要标题，不要解释。`,
-  timeCapsulePrompt: `请为 {{userName}} 写一封“现在寄给未来自己的密封信”。
+2. 中文严格控制在 150 - 180 字以内；英文控制在 110 - 140 words。
+3. 只输出信件正文，不要标题，不要称呼，不要落款，不要解释。`,
+  timeCapsulePrompt: `# Role
+你现在需要化身为【当下正在经历挣扎与迷茫的用户 {{userName}} 本人】。你刚刚结束了一次深度的自我对话，现在要给【未来的自己】写一封极简、真诚的时光胶囊密封信。
 
-这封信不会立刻展示给用户，而是在未来某个日期通过邮件发送给用户。
+# Context
+请根据【双重用户画像 JSON 数据】来撰写这封信，确保内容与用户今天真实的挣扎和刚做出的决定高度重合：
+- 用户当下的困境与隐喻：{{present_persona}}
+- 用户未来的渴望与隐喻：{{future_persona}}
 
-语气要求：
-- 像一个温柔、清醒、不过度鸡汤的未来见证者
-- 回应用户此刻的困惑与改变意愿
-- 不做诊断，不承诺治愈
-- 让未来的用户能够回看今天的自己
-- 中文控制在 180-260 字，英文控制在 140-220 words
+# Core Writing Rules
+1. 必须使用第一人称“我”写给“你”。开头要自然，直接进入叙事，不要使用“你好”“亲爱的自己”等套话。
+2. 禁止在信中出现任何具体数字和时间跨度词汇，不要写“30天”“一个月”“一年后”“多久以后”这类表达。只用“未来的你”“当你读到这封信时”之类自然指代。
+3. 真实记录今天的难，不强求彻底改变。重点是：我不奢望你已经解决了一切，但希望你稍微好了一点点。
+4. 必须自然融入 present_persona.core_emotion 和 present_persona.living_metaphor。
+5. 必须提到 future_persona.symbolic_micro_action，询问未来的自己有没有试过这件极其微小的事。不要求坚持很多次，只要试过一两次，今天的“我”就会觉得很不错。
+6. 结尾给未来的自己一个极轻量、温暖的问候，像笨拙但真诚的朋友在轻轻确认彼此。
+7. 不要诊断，不要说教，不要过度抒情，不要把语言写得太满。
 
-对话摘要：
-{{chatHistorySummary}}
-
-只输出信件正文，不要标题，不要解释。`,
+# Formatting Constraints
+1. 使用用户当前的语言。中文用户请使用中文。
+2. 中文严格控制在 180 - 240 字以内；英文控制在 130 - 170 words。
+3. 只输出信件正文，不要标题，不要落款，不要任何解释。`,
 };
 
 const legacyChatKeys = ['futureSelfRole', 'conversationProtocol', 'responseRules'];
@@ -306,29 +319,54 @@ export const buildCurrentImagePrompt = ({ userName, presentPersona, promptSettin
     .replaceAll('{{presentVisualTags}}', presentTags);
 };
 
-export const buildLetterPrompt = ({ userName, chatHistorySummary, language, promptSettings }) => {
+export const buildLetterPrompt = ({ userName, chatHistorySummary, language, promptSettings, personaProfile }) => {
   const settings = mergePromptSettings(promptSettings);
-  const intro = language === 'zh'
-    ? `请以“未来自我”的身份，给 ${userName || '用户'} 写一封 100 字以内的中文短信。`
-    : `Write a moving letter under 100 words to ${userName || 'the user'} as their future self.`;
+  const presentPersona = JSON.stringify(personaProfile?.present_persona || {}, null, 2);
+  const futurePersona = JSON.stringify(personaProfile?.future_persona || {}, null, 2);
+  const prompt = settings.letterPrompt
+    .replaceAll('{{userName}}', userName || '用户')
+    .replaceAll('{{present_persona}}', presentPersona)
+    .replaceAll('{{future_persona}}', futurePersona);
+  const languageRule = language === 'zh'
+    ? '请使用中文写这封信。'
+    : 'Write the letter in English.';
 
   return `
-${intro}
-Conversation background: "${chatHistorySummary || ''}".
-${settings.letterPrompt}
+Conversation background:
+"${chatHistorySummary || ''}".
+
+${prompt}
+
+${languageRule}
 `;
 };
 
-export const buildTimeCapsulePrompt = ({ userName, chatHistorySummary, language, promptSettings }) => {
+export const buildTimeCapsulePrompt = ({ userName, chatHistorySummary, language, promptSettings, personaProfile }) => {
   const settings = mergePromptSettings(promptSettings);
-  const normalizedSummary = chatHistorySummary || '(no summary)';
+  const presentPersona = JSON.stringify(personaProfile?.present_persona || {}, null, 2);
+  const futurePersona = JSON.stringify(personaProfile?.future_persona || {}, null, 2);
   const prompt = settings.timeCapsulePrompt
     .replaceAll('{{userName}}', userName || '用户')
-    .replaceAll('{{chatHistorySummary}}', normalizedSummary);
+    .replaceAll('{{present_persona}}', presentPersona)
+    .replaceAll('{{future_persona}}', futurePersona);
 
   if (language === 'en') {
-    return `${prompt}\n\nWrite the final letter in English.`;
+    return `
+Conversation background:
+"${chatHistorySummary || ''}".
+
+${prompt}
+
+Write the letter in English.
+`;
   }
 
-  return `${prompt}\n\n请使用中文写信。`;
+  return `
+对话背景：
+"${chatHistorySummary || ''}"。
+
+${prompt}
+
+请使用中文写信。
+`;
 };

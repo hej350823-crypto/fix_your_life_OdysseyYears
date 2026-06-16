@@ -12,6 +12,7 @@ import { getNetworkDiagnostics, networkFetch } from './networkFetch.js';
 const fallbackImage = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=1000&auto=format&fit=crop';
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
+const RESEND_BASE_URL = 'https://api.resend.com';
 const MAX_CHAT_TURNS = 6;
 
 const createApiError = (message, statusCode = 500, meta = {}) => Object.assign(new Error(message), {
@@ -247,6 +248,127 @@ const sendJson = (res, status, payload) => {
   res.end(JSON.stringify(payload));
 };
 
+const escapeHtml = (value = '') => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const formatCapsuleMessageHtml = (message = '') => escapeHtml(message).replace(/\n/g, '<br />');
+
+const isValidEmail = (email = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const buildTimeCapsuleEmail = ({ userName, message, imageUrl, sendAt, language }) => {
+  const safeName = escapeHtml(userName || (language === 'zh' ? '朋友' : 'friend'));
+  const safeDate = escapeHtml(new Date(sendAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }));
+  const safeMessage = formatCapsuleMessageHtml(message);
+  const canEmbedImage = typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl);
+
+  if (language === 'en') {
+    return {
+      subject: `A note from your past self, ${safeName}`,
+      html: `
+        <div style="margin:0 auto;max-width:640px;padding:32px 20px;font-family:Georgia,'Times New Roman',serif;color:#1f2937;line-height:1.8;">
+          <p style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#9a3412;">Future Mailbox</p>
+          <h1 style="margin:0 0 16px;font-size:32px;line-height:1.2;">A letter you asked us to return today.</h1>
+          <p style="margin:0 0 24px;font-family:Arial,sans-serif;color:#57534e;">Scheduled for ${safeDate}</p>
+          <div style="padding:24px;border:1px solid #e7e5e4;border-radius:20px;background:#fafaf9;">
+            <p style="margin:0 0 12px;">Dear ${safeName},</p>
+            <p style="margin:0;">${safeMessage}</p>
+          </div>
+          ${canEmbedImage ? `<div style="margin-top:24px;"><img src="${imageUrl}" alt="Your present portrait" style="width:100%;border-radius:20px;display:block;object-fit:cover;" /></div>` : ''}
+        </div>
+      `,
+      text: `A letter you asked us to return today.\nScheduled for ${safeDate}\n\nDear ${userName || 'friend'},\n\n${message}`,
+    };
+  }
+
+  return {
+    subject: `${userName || '你'}，这是你留给未来的一封信`,
+    html: `
+      <div style="margin:0 auto;max-width:640px;padding:32px 20px;font-family:Georgia,'Times New Roman',serif;color:#1f2937;line-height:1.8;">
+        <p style="font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#9a3412;">未来邮局</p>
+        <h1 style="margin:0 0 16px;font-size:32px;line-height:1.2;">这是你曾经预约在今天打开的一封信。</h1>
+        <p style="margin:0 0 24px;font-family:Arial,sans-serif;color:#57534e;">封存日期已到：${safeDate}</p>
+        <div style="padding:24px;border:1px solid #e7e5e4;border-radius:20px;background:#fafaf9;">
+          <p style="margin:0 0 12px;">${safeName}：</p>
+          <p style="margin:0;">${safeMessage}</p>
+        </div>
+        ${canEmbedImage ? `<div style="margin-top:24px;"><img src="${imageUrl}" alt="今天的你" style="width:100%;border-radius:20px;display:block;object-fit:cover;" /></div>` : ''}
+      </div>
+    `,
+    text: `这是你曾经预约在今天打开的一封信。\n封存日期已到：${safeDate}\n\n${userName || '你'}：\n\n${message}`,
+  };
+};
+
+const scheduleResendEmail = async ({ to, userName, message, imageUrl, sendAt, language }) => {
+  if (!process.env.RESEND_API_KEY) {
+    throw createApiError('Resend is not configured. Add RESEND_API_KEY to enable real email delivery.', 503, {
+      errorType: 'config',
+      hint: '还没配置 RESEND_API_KEY，所以现在不能真的预约发邮件。',
+    });
+  }
+
+  const from = process.env.RESEND_FROM_EMAIL || 'Fix Your Life <onboarding@resend.dev>';
+  const replyTo = process.env.RESEND_REPLY_TO;
+  const emailContent = buildTimeCapsuleEmail({ userName, message, imageUrl, sendAt, language });
+
+  let response;
+  try {
+    response = await networkFetch(`${RESEND_BASE_URL}/emails`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: emailContent.subject,
+        html: emailContent.html,
+        text: emailContent.text,
+        scheduledAt: sendAt,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
+    });
+  } catch (error) {
+    const diagnostics = await getNetworkDiagnostics(RESEND_BASE_URL).catch(() => null);
+    throw createApiError(
+      `Resend API request failed: ${error?.message || 'fetch failed'}`,
+      502,
+      {
+        provider: 'Resend',
+        baseUrl: RESEND_BASE_URL,
+        ...getFetchErrorMeta({ providerName: 'Resend', baseUrl: RESEND_BASE_URL, diagnostics }),
+      },
+    );
+  }
+
+  if (!response.ok) {
+    const detail = await response.text();
+    const meta = getResponseErrorMeta({
+      providerName: 'Resend',
+      status: response.status,
+      detail,
+      action: 'email',
+    });
+    throw createApiError(`Resend API request failed: ${response.status} ${detail}`, response.status, {
+      provider: 'Resend',
+      baseUrl: RESEND_BASE_URL,
+      upstreamStatus: response.status,
+      upstreamDetail: detail,
+      ...meta,
+    });
+  }
+
+  return response.json();
+};
+
 const createDemoPersonaProfile = (name, language = 'zh') => {
   if (language === 'en') {
     return {
@@ -459,6 +581,7 @@ const handleFinalLetter = async (body) => {
           ].filter(Boolean).join('\n'),
           language,
           promptSettings: body.promptSettings,
+          personaProfile: body.personaProfile,
         }),
       },
     ],
@@ -493,6 +616,7 @@ const handleTimeCapsuleLetter = async (body) => {
           ].filter(Boolean).join('\n'),
           language,
           promptSettings: body.promptSettings,
+          personaProfile: body.personaProfile,
         }),
       },
     ],
@@ -596,21 +720,54 @@ const handleTimeCapsule = async (body) => {
   const { email, message, imageUrl, sendAt, userName, language = 'zh' } = body;
 
   if (!email || !message || !sendAt) {
-    return {
-      error: 'Missing required time capsule fields',
-    };
+    throw createApiError('Missing required time capsule fields', 400, {
+      errorType: 'validation',
+      hint: '邮箱、信件内容和发送时间不能为空。',
+    });
   }
 
-  return {
-    id: `demo-${Date.now()}`,
-    status: 'pending',
-    storedLocally: true,
+  if (!isValidEmail(email)) {
+    throw createApiError('Invalid email address', 400, {
+      errorType: 'validation',
+      hint: '请输入一个有效的邮箱地址。',
+    });
+  }
+
+  const sendDate = new Date(sendAt);
+  if (Number.isNaN(sendDate.getTime())) {
+    throw createApiError('Invalid sendAt value', 400, {
+      errorType: 'validation',
+      hint: '发送时间格式不正确。',
+    });
+  }
+
+  const now = Date.now();
+  const maxScheduledAt = now + 30 * 24 * 60 * 60 * 1000;
+  if (sendDate.getTime() <= now || sendDate.getTime() > maxScheduledAt) {
+    throw createApiError('Scheduled time must be within the next 30 days', 400, {
+      errorType: 'validation',
+      hint: 'Resend 最多只能预约未来 30 天内的邮件。',
+    });
+  }
+
+  const scheduled = await scheduleResendEmail({
+    to: email,
     userName,
-    email,
     message,
     imageUrl,
-    sendAt,
+    sendAt: sendDate.toISOString(),
     language,
+  });
+
+  return {
+    id: scheduled.id || `scheduled-${Date.now()}`,
+    status: 'pending',
+    storedLocally: false,
+    userName,
+    email,
+    sendAt: sendDate.toISOString(),
+    language,
+    provider: 'resend',
   };
 };
 

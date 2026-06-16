@@ -22,7 +22,15 @@ export const saveTimeCapsule = async (payload: TimeCapsulePayload): Promise<{ id
         storedLocally: Boolean(data.storedLocally),
       };
     }
+
+    const detail = await response.json().catch(() => null) as { error?: string; hint?: string | null } | null;
+    throw new Error(detail?.hint || detail?.error || `Time capsule API request failed: ${response.status}`);
   } catch (e) {
+    const isNetworkError = e instanceof TypeError;
+    if (!isNetworkError) {
+      throw e;
+    }
+
     console.warn('Time capsule API unavailable. Saving locally for demo mode.', e);
   }
 

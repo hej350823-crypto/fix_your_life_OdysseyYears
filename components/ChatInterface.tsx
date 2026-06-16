@@ -2,10 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   createChatSession,
   ChatSession,
-  generateCurrentSelfPortrait,
   generateFinalLetter,
   generateFutureSelfPortrait,
-  generateTimeCapsuleLetter,
   generateUserPersonaProfile,
 } from '../services/geminiService';
 import { t } from '../i18n';
@@ -128,9 +126,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
       if (testMode || userData.isTestMode) {
         onComplete({
           imageUrl: '/test-assets/future-self.svg',
-          timeCapsuleImageUrl: '/test-assets/current-self.svg',
           letter: testCopy.finalLetter,
-          timeCapsuleLetter: testCopy.timeCapsuleLetter,
+          conversationSummary,
         });
         return;
       }
@@ -141,14 +138,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
         ...getPersonaVisualTags(personaProfile.future_persona?.visual_tags_en),
       ];
 
-      const [letter, timeCapsuleLetter, imageUrl, timeCapsuleImageUrl] = await Promise.all([
+      const [letter, imageUrl] = await Promise.all([
         generateFinalLetter(userData.name, conversationSummary, language, promptSettings, personaProfile),
-        generateTimeCapsuleLetter(userData.name, conversationSummary, language, promptSettings, personaProfile),
         generateFutureSelfPortrait(userData.name, enrichedTags, promptSettings, userData.photo, personaProfile),
-        generateCurrentSelfPortrait(userData.name, personaProfile, promptSettings, userData.photo),
       ]);
 
-      onComplete({ imageUrl, timeCapsuleImageUrl, letter, timeCapsuleLetter, personaProfile });
+      onComplete({ imageUrl, letter, conversationSummary, personaProfile });
     } catch (error) {
       setMessages((prev) => [
         ...prev,
