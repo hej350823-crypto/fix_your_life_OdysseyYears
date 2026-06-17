@@ -71,7 +71,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
 
   const collectedTagsRef = useRef<Set<string>>(new Set());
   const chatSession = useRef<ChatSession | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const streamControllerRef = useRef(0);
   const text = t(language).chat;
   const testCopy = t(language).test;
@@ -185,7 +185,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   }, [userData, promptSettings]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const scrollEl = messagesScrollRef.current;
+    if (!scrollEl) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollEl.scrollTo({
+        top: scrollEl.scrollHeight,
+        behavior: 'smooth',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [messages, isTyping, currentSuggestions]);
 
   useEffect(() => {
@@ -283,7 +293,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
 
   if (isGenerating) {
     return (
-      <div className="flex min-h-[100svh] flex-col items-center justify-center space-y-8 bg-warmWhite animate-pulse-slow md:min-h-screen">
+      <div className="flex h-[100dvh] min-h-[100svh] flex-col items-center justify-center space-y-8 bg-warmWhite animate-pulse-slow md:min-h-screen">
         <div className="relative w-32 h-32">
           <div className="absolute inset-0 bg-orange-200 rounded-full blur-3xl animate-pulse" />
           <div className="absolute inset-8 bg-white/90 rounded-full blur-xl" />
@@ -297,14 +307,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   }
 
   return (
-    <div className={`flex min-h-[100svh] w-full flex-col overflow-hidden transition-colors duration-1000 ease-in-out md:h-screen md:flex-row ${ambientGradientByStage[stage]}`}>
-      <aside className="relative z-10 flex min-h-[220px] w-full items-center justify-center border-b border-white/20 px-6 pb-6 pt-16 transition-all duration-700 sm:min-h-[260px] md:h-screen md:w-[40%] md:border-b-0 md:p-12">
+    <div className={`flex h-[100dvh] min-h-[100svh] w-full flex-col overflow-hidden transition-colors duration-1000 ease-in-out md:h-screen md:flex-row ${ambientGradientByStage[stage]}`}>
+      <aside className="relative z-10 flex min-h-[180px] shrink-0 items-center justify-center border-b border-white/20 px-6 pb-5 pt-14 transition-all duration-700 sm:min-h-[220px] md:h-screen md:w-[40%] md:border-b-0 md:p-12">
         <div className="absolute top-0 left-0 w-full h-full opacity-50 transition-colors duration-1000 mix-blend-multiply pointer-events-none">
           <div className={`absolute left-4 top-6 h-40 w-40 rounded-full blur-[70px] animate-float sm:left-8 sm:top-8 sm:h-52 sm:w-52 md:left-10 md:top-10 md:h-64 md:w-64 md:blur-[80px] ${stage === 'anti-vision' ? 'bg-slate-200' : 'bg-orange-100'}`} />
           <div className={`absolute bottom-4 right-4 h-40 w-40 rounded-full blur-[70px] animate-pulse-slow sm:bottom-8 sm:right-8 sm:h-52 sm:w-52 md:bottom-10 md:right-10 md:h-64 md:w-64 md:blur-[80px] ${stage === 'anti-vision' ? 'bg-stone-200' : 'bg-purple-100'}`} />
         </div>
 
-        <div className="relative h-[124px] w-[96px] transition-all duration-700 ease-out animate-breathe sm:h-[156px] sm:w-[118px] md:h-[420px] md:w-[320px]">
+        <div className="relative h-[108px] w-[84px] transition-all duration-700 ease-out animate-breathe sm:h-[144px] sm:w-[110px] md:h-[420px] md:w-[320px]">
           <div className="absolute -inset-4 md:-inset-8 rotate-[-90deg]">
             <svg className="w-full h-full" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="48" fill="none" stroke="#e7e5e4" strokeWidth="0.5" strokeDasharray="4 4" />
@@ -358,9 +368,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
         )}
       </aside>
 
-      <main className="relative z-10 flex min-h-0 flex-1 flex-col bg-transparent">
-        <div className="flex-1 overflow-y-auto no-scrollbar px-5 py-6 scroll-smooth sm:px-6 md:px-0 md:py-12">
-          <div className="mx-auto max-w-2xl space-y-10 pb-10 md:space-y-16 md:pb-24">
+      <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
+        <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar px-5 py-5 scroll-smooth sm:px-6 md:px-0 md:py-12">
+          <div className="mx-auto max-w-2xl space-y-8 pb-8 md:space-y-16 md:pb-24">
             {messages.map((msg, idx) => {
               const isLast = idx === messages.length - 1;
               const isUser = msg.sender === 'user';
@@ -398,11 +408,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
                 <span className="text-orange-300">. . .</span>
               </div>
             )}
-            <div ref={messagesEndRef} className="h-4" />
+            <div className="h-4" />
           </div>
         </div>
 
-        <div className={`sticky bottom-0 z-20 border-t border-white/35 bg-gradient-to-t px-4 pb-4 pt-3 ${inputFadeByStage[stage]} to-transparent transition-colors duration-1000 backdrop-blur-md md:border-t-0 md:px-10 md:pb-10 md:pt-6`}>
+        <div className={`sticky bottom-0 z-20 border-t border-white/35 bg-gradient-to-t px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 ${inputFadeByStage[stage]} to-transparent transition-colors duration-1000 backdrop-blur-md md:border-t-0 md:px-10 md:pb-10 md:pt-6`}>
           <div className="relative mx-auto max-w-3xl">
             {isReadyForPortrait && !isTyping ? (
               <div className="flex justify-center animate-fade-in-up">
@@ -444,6 +454,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
                   disabled={isTyping}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                  onFocus={() => {
+                    window.setTimeout(() => {
+                      messagesScrollRef.current?.scrollTo({
+                        top: messagesScrollRef.current.scrollHeight,
+                        behavior: 'smooth',
+                      });
+                    }, 250);
+                  }}
                   placeholder={text.placeholder}
                   className="flex-1 border-none bg-transparent px-3 py-2 text-sm font-sans text-charcoal outline-none placeholder:text-stone-400 focus:ring-0 sm:px-4 md:text-base"
                 />

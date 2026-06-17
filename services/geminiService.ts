@@ -37,6 +37,7 @@ type ApiErrorResponse = {
 const fallbackImage = '/test-assets/future-self.png';
 const MAX_CHAT_TURNS = 6;
 const ADMIN_TOKEN_STORAGE_KEY = 'fix-your-life.admin-token.v1';
+const STREAM_IDLE_TIMEOUT_MS = 90000;
 
 const hasCustomPromptSettings = (promptSettings?: PromptSettings) => {
   if (!promptSettings) return false;
@@ -125,43 +126,76 @@ const postAiActionStream = async (
     delete nextPayload.promptSettings;
   }
 
-  const response = await fetch('/api/gemini', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      action,
-      ...nextPayload,
-    }),
-  });
+  const abortController = new AbortController();
+  let streamTimeout: ReturnType<typeof setTimeout> | undefined;
+  const refreshStreamTimeout = () => {
+    if (streamTimeout) {
+      clearTimeout(streamTimeout);
+    }
 
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null) as ApiErrorResponse | null;
-    throw new Error(formatApiErrorMessage(detail, response.status));
-  }
+    streamTimeout = setTimeout(() => {
+      abortController.abort();
+    }, STREAM_IDLE_TIMEOUT_MS);
+  };
 
-  if (!response.body) {
-    throw new Error('Streaming response body is unavailable.');
-  }
+  try {
+    refreshStreamTimeout();
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let finalResponse: ChatResponse | null = null;
+    const response = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: abortController.signal,
+      body: JSON.stringify({
+        action,
+        ...nextPayload,
+      }),
+    });
 
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => null) as ApiErrorResponse | null;
+      throw new Error(formatApiErrorMessage(detail, response.status));
+    }
 
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+    if (!response.body) {
+      throw new Error('Streaming response body is unavailable.');
+    }
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalResponse: ChatResponse | null = null;
 
-      const event = JSON.parse(trimmed) as ChatStreamEvent;
+    while (true) {
+      const { value, done } = await reader.read();
+      refreshStreamTimeout();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        const event = JSON.parse(trimmed) as ChatStreamEvent;
+        onEvent(event);
+
+        if (event.type === 'error') {
+          throw new Error(event.error || 'Streaming request failed.');
+        }
+
+        if (event.type === 'done' && event.data) {
+          finalResponse = event.data;
+        }
+      }
+
+      if (done) break;
+    }
+
+    if (buffer.trim()) {
+      const event = JSON.parse(buffer.trim()) as ChatStreamEvent;
       onEvent(event);
 
       if (event.type === 'error') {
@@ -173,27 +207,22 @@ const postAiActionStream = async (
       }
     }
 
-    if (done) break;
-  }
-
-  if (buffer.trim()) {
-    const event = JSON.parse(buffer.trim()) as ChatStreamEvent;
-    onEvent(event);
-
-    if (event.type === 'error') {
-      throw new Error(event.error || 'Streaming request failed.');
+    if (!finalResponse) {
+      throw new Error('Streaming response ended before completion.');
     }
 
-    if (event.type === 'done' && event.data) {
-      finalResponse = event.data;
+    return finalResponse;
+  } catch (error) {
+    if (abortController.signal.aborted) {
+      throw new Error('Streaming response timed out after a long pause. Please try again.');
+    }
+
+    throw error;
+  } finally {
+    if (streamTimeout) {
+      clearTimeout(streamTimeout);
     }
   }
-
-  if (!finalResponse) {
-    throw new Error('Streaming response ended before completion.');
-  }
-
-  return finalResponse;
 };
 
 const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
