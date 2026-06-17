@@ -37,7 +37,7 @@ type ApiErrorResponse = {
 const fallbackImage = '/test-assets/future-self.png';
 const MAX_CHAT_TURNS = 6;
 const ADMIN_TOKEN_STORAGE_KEY = 'fix-your-life.admin-token.v1';
-const STREAM_IDLE_TIMEOUT_MS = 90000;
+const STREAM_IDLE_TIMEOUT_MS = 15000;
 
 const hasCustomPromptSettings = (promptSettings?: PromptSettings) => {
   if (!promptSettings) return false;
