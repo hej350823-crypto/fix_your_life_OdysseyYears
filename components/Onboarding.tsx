@@ -9,8 +9,8 @@ interface OnboardingProps {
   onComplete: (data: UserData) => void;
 }
 
-const MAX_UPLOAD_EDGE = 1600;
-const UPLOAD_EXPORT_QUALITY = 0.84;
+const MAX_UPLOAD_EDGE = 1024;
+const UPLOAD_EXPORT_QUALITY = 0.76;
 
 const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName = '', onComplete }) => {
   const TEST_PROFILE_SOURCE = '/test-assets/test-source.png';
@@ -74,11 +74,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
     const image = await loadImage(sourceDataUrl);
     const longestEdge = Math.max(image.naturalWidth, image.naturalHeight);
 
-    if (longestEdge <= MAX_UPLOAD_EDGE) {
-      return sourceDataUrl;
-    }
-
-    const scale = MAX_UPLOAD_EDGE / longestEdge;
+    const scale = Math.min(1, MAX_UPLOAD_EDGE / longestEdge);
     const width = Math.max(1, Math.round(image.naturalWidth * scale));
     const height = Math.max(1, Math.round(image.naturalHeight * scale));
     const canvas = document.createElement('canvas');

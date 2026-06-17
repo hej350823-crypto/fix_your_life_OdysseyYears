@@ -38,11 +38,56 @@ const fallbackImage = '/test-assets/future-self.png';
 const MAX_CHAT_TURNS = 6;
 const ADMIN_TOKEN_STORAGE_KEY = 'fix-your-life.admin-token.v1';
 const STREAM_IDLE_TIMEOUT_MS = 15000;
+const IMAGE_API_MAX_EDGE = 1024;
+const IMAGE_API_EXPORT_QUALITY = 0.76;
 
 const withoutPhoto = (userData: UserData): UserData => ({
   ...userData,
   photo: null,
 });
+
+const isImageDataUrl = (value?: string | null) => (
+  typeof value === 'string' && /^data:image\//i.test(value)
+);
+
+const loadBrowserImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error('Image decode failed'));
+  image.src = src;
+});
+
+const compressImageDataUrl = async (
+  imageDataUrl?: string | null,
+  maxEdge = IMAGE_API_MAX_EDGE,
+  quality = IMAGE_API_EXPORT_QUALITY,
+) => {
+  if (!isImageDataUrl(imageDataUrl) || typeof document === 'undefined') {
+    return imageDataUrl || '';
+  }
+
+  try {
+    const image = await loadBrowserImage(imageDataUrl);
+    const longestEdge = Math.max(image.naturalWidth, image.naturalHeight);
+    const scale = Math.min(1, maxEdge / longestEdge);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return imageDataUrl;
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch (error) {
+    console.warn('Image payload compression failed. Sending original image.', error);
+    return imageDataUrl;
+  }
+};
 
 const hasCustomPromptSettings = (promptSettings?: PromptSettings) => {
   if (!promptSettings) return false;
@@ -338,11 +383,12 @@ export const generateFutureSelfPortrait = async (
   personaProfile?: UserPersonaProfile,
 ): Promise<string> => {
   try {
+    const preparedUserPhoto = await compressImageDataUrl(userPhoto);
     const response = await postAiAction<{ imageUrl: string }>('future-portrait', {
       userName,
       collectedTags,
       promptSettings,
-      userPhoto,
+      userPhoto: preparedUserPhoto,
       personaProfile,
     });
 
@@ -360,11 +406,12 @@ export const generateCurrentSelfPortrait = async (
   userPhoto?: string | null,
 ): Promise<string> => {
   try {
+    const preparedUserPhoto = await compressImageDataUrl(userPhoto);
     const response = await postAiAction<{ imageUrl: string }>('current-portrait', {
       userName,
       personaProfile,
       promptSettings,
-      userPhoto,
+      userPhoto: preparedUserPhoto,
     });
 
     return response.imageUrl || fallbackImage;

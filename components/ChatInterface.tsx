@@ -41,6 +41,21 @@ const inputFadeByStage: Record<ConversationStage, string> = {
   ideal: 'from-orange-50/88 via-amber-50/62',
 };
 
+const generationStepsByLanguage: Record<Language, string[]> = {
+  zh: [
+    '整理你的对话线索',
+    '提炼未来自我的气质',
+    '写下未来想对你说的话',
+    '生成那张穿过迷雾后的画像',
+  ],
+  en: [
+    'Organizing your conversation clues',
+    'Finding the tone of your future self',
+    'Writing what the future wants to say',
+    'Rendering the portrait beyond the fog',
+  ],
+};
+
 const collectVisualTags = (tags: unknown, target: Set<string>) => {
   if (!Array.isArray(tags)) return;
   tags
@@ -68,6 +83,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   const [blurLevel, setBlurLevel] = useState(30);
   const [turnCount, setTurnCount] = useState(0);
   const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]);
+  const [generationStep, setGenerationStep] = useState(0);
 
   const collectedTagsRef = useRef<Set<string>>(new Set());
   const chatSession = useRef<ChatSession | null>(null);
@@ -205,6 +221,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
     setBlurLevel(Math.max(0, 30 - progress * 30));
   }, [turnCount]);
 
+  useEffect(() => {
+    if (!isGenerating) {
+      setGenerationStep(0);
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setGenerationStep((current) => Math.min(current + 1, generationStepsByLanguage[language].length - 1));
+    }, 2600);
+
+    return () => window.clearInterval(intervalId);
+  }, [isGenerating, language]);
+
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || input;
     if (!textToSend.trim() || !chatSession.current || isTyping) return;
@@ -242,6 +271,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   };
 
   const handleVisualize = async () => {
+    setGenerationStep(0);
     setIsGenerating(true);
     try {
       const conversationSummary = messages.map((m) => `${m.sender}: ${m.text}`).join('\n').slice(-2000);
@@ -290,17 +320,80 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   };
 
   const isReadyForPortrait = turnCount >= MAX_CHAT_TURNS;
+  const generationSteps = generationStepsByLanguage[language];
+  const generationProgress = `${Math.round(((generationStep + 1) / generationSteps.length) * 100)}%`;
+  const generationTags = Array.from(collectedTagsRef.current).slice(0, 4);
+  const generationFallbackTags = language === 'zh'
+    ? ['方向感', '平静', '清晨光线', '未来自我']
+    : ['direction', 'calm', 'morning light', 'future self'];
+  const visibleGenerationTags = generationTags.length > 0 ? generationTags : generationFallbackTags;
 
   if (isGenerating) {
     return (
-      <div className="flex h-[100dvh] min-h-[100svh] flex-col items-center justify-center space-y-8 bg-warmWhite animate-pulse-slow md:min-h-screen">
-        <div className="relative w-32 h-32">
-          <div className="absolute inset-0 bg-orange-200 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute inset-8 bg-white/90 rounded-full blur-xl" />
+      <div className="relative flex h-[100dvh] min-h-[100svh] flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-warmWhite via-orange-50/40 to-violet-50/30 px-6 py-10 md:min-h-screen">
+        <div className="absolute inset-0 opacity-70">
+          <div className="absolute left-[-18%] top-[12%] h-56 w-56 rounded-full bg-orange-100 blur-[80px] animate-pulse-slow md:h-80 md:w-80" />
+          <div className="absolute bottom-[8%] right-[-16%] h-56 w-56 rounded-full bg-violet-100 blur-[80px] animate-float md:h-80 md:w-80" />
         </div>
-        <div className="text-center space-y-2 z-10">
-          <h2 className="font-serif text-3xl text-charcoal">{text.generating}</h2>
-          <p className="font-sans text-stone-400 text-xs tracking-widest uppercase">{text.generatingSub}</p>
+
+        <div className="relative z-10 flex w-full max-w-xl flex-col items-center text-center">
+          <div className="relative h-32 w-24 animate-breathe overflow-hidden rounded-b-[28px] rounded-t-[999px] border-4 border-white bg-stone-100 shadow-[0_24px_70px_rgba(120,113,108,0.22)] sm:h-40 sm:w-28">
+            {userData.photo ? (
+              <img
+                src={userData.photo}
+                alt=""
+                decoding="async"
+                className="h-full w-full scale-110 object-cover blur-[10px] saturate-75 transition-all duration-1000"
+                style={{ objectPosition: userData.photo === TEST_PROFILE_SOURCE ? 'left center' : 'center' }}
+              />
+            ) : (
+              <div className="h-full w-full bg-gradient-to-br from-stone-100 via-orange-50 to-violet-50" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-orange-100/25" />
+          </div>
+
+          <div className="mt-8 space-y-3">
+            <p className="font-sans text-[11px] uppercase tracking-[0.24em] text-stone-400">
+              {text.generatingSub}
+            </p>
+            <h2 className="font-serif text-3xl leading-tight text-charcoal sm:text-4xl">
+              {text.generating}
+            </h2>
+          </div>
+
+          <div className="mt-8 w-full max-w-md">
+            <div className="h-1.5 overflow-hidden rounded-full bg-white/80 shadow-inner">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-orange-300 via-rose-300 to-violet-300 transition-all duration-700 ease-out"
+                style={{ width: generationProgress }}
+              />
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-white/70 bg-white/72 px-5 py-4 text-left shadow-[0_18px_50px_rgba(120,113,108,0.15)] backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <div className="h-2.5 w-2.5 rounded-full bg-orange-300 shadow-[0_0_0_6px_rgba(253,186,116,0.20)] animate-pulse" />
+                <p className="font-sans text-sm font-medium text-stone-700 sm:text-base">
+                  {generationSteps[generationStep]}
+                </p>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {visibleGenerationTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-stone-200/70 bg-white/80 px-3 py-1.5 text-[11px] leading-none text-stone-500"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-6 max-w-sm font-sans text-xs leading-6 text-stone-400">
+            {language === 'zh'
+              ? '这一步可能会多等一会儿，正在把你的回答整理成画像和一封未来信。'
+              : 'This can take a moment while your answers become a portrait and a future letter.'}
+          </p>
         </div>
       </div>
     );
