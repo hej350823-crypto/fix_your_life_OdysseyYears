@@ -184,107 +184,6 @@ const callTextModel = async ({ messages, responseFormat, maxTokens = 1000 }) => 
   return data.choices?.[0]?.message?.content || '';
 };
 
-const callTextModelStream = async ({ messages, maxTokens = 1000, onDelta }) => {
-  const provider = getTextProvider();
-  if (!provider) {
-    return null;
-  }
-
-  let response;
-  try {
-    response = await fetch(`${provider.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${provider.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: provider.model,
-        messages,
-        max_tokens: maxTokens,
-        stream: true,
-      }),
-    });
-  } catch (error) {
-    const diagnostics = await getNetworkDiagnostics(provider.baseUrl).catch(() => null);
-    throw createApiError(
-      `${provider.name} API request failed: ${error?.message || 'fetch failed'}`,
-      502,
-      {
-        provider: provider.name,
-        baseUrl: provider.baseUrl,
-        ...getFetchErrorMeta({ providerName: provider.name, baseUrl: provider.baseUrl, diagnostics }),
-      },
-    );
-  }
-
-  if (!response.ok) {
-    const detail = await response.text();
-    const meta = getResponseErrorMeta({
-      providerName: provider.name,
-      status: response.status,
-      detail,
-      action: 'text',
-    });
-    throw createApiError(`${provider.name} API request failed: ${response.status} ${detail}`, response.status, {
-      provider: provider.name,
-      baseUrl: provider.baseUrl,
-      upstreamStatus: response.status,
-      upstreamDetail: detail,
-      ...meta,
-    });
-  }
-
-  if (!response.body) {
-    throw createApiError(`${provider.name} streaming response body is unavailable.`, 502, {
-      provider: provider.name,
-      baseUrl: provider.baseUrl,
-      errorType: 'provider_error',
-      hint: '上游返回了不可读取的流响应。',
-    });
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let fullText = '';
-
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-
-    const events = buffer.split('\n\n');
-    buffer = events.pop() || '';
-
-    for (const rawEvent of events) {
-      const lines = rawEvent.split('\n').map((line) => line.trim()).filter(Boolean);
-
-      for (const line of lines) {
-        if (!line.startsWith('data:')) continue;
-
-        const data = line.slice(5).trim();
-        if (!data || data === '[DONE]') continue;
-
-        try {
-          const payload = JSON.parse(data);
-          const delta = payload.choices?.[0]?.delta?.content;
-
-          if (typeof delta === 'string' && delta.length > 0) {
-            fullText += delta;
-            onDelta?.(delta);
-          }
-        } catch {
-          // Ignore malformed stream chunks from upstream.
-        }
-      }
-    }
-
-    if (done) break;
-  }
-
-  return fullText;
-};
-
 const callArkImage = async ({ prompt, referenceImage }) => {
   const apiKey = process.env.ARK_API_KEY || process.env.DOUBAO_API_KEY;
   const imageModel = process.env.ARK_IMAGE_MODEL
@@ -432,26 +331,6 @@ const escapeHtml = (value = '') => value
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
-const createChatMetadataPrompt = ({ currentTurn, assistantReply, language }) => `
-Return valid json only, with this exact shape:
-{
-  "suggestions": ["exactly 4 choice-first possible user answers"],
-  "visual_tags": ["english visual tag"],
-  "current_turn": 1
-}
-
-Rules:
-- current_turn must be the next turn number after the assistant reply, between 1 and ${MAX_CHAT_TURNS}
-- suggestions must be short, natural, first-person user replies
-- keep suggestions in ${language === 'en' ? 'English' : 'Chinese'}
-- visual_tags must be concise English image cues
-
-Assistant reply:
-${assistantReply}
-
-Previous current_turn: ${currentTurn}
-`;
-
 const extractChatReplyContent = (content = '') => {
   const cleaned = cleanJsonString(content);
 
@@ -472,6 +351,59 @@ const extractChatReplyContent = (content = '') => {
   return {
     text: content.trim(),
     metadata: null,
+  };
+};
+
+const stripInlineSuggestions = (text = '') => {
+  const normalized = String(text || '').trim();
+  if (!normalized) {
+    return { text: '', suggestions: [] };
+  }
+
+  const numberedPattern = /(?:^|\s)(?:1[.、)]|①)\s*([\s\S]*?)(?=\s(?:2[.、)]|②)\s*)\s*(?:2[.、)]|②)\s*([\s\S]*?)(?=\s(?:3[.、)]|③)\s*)\s*(?:3[.、)]|③)\s*([\s\S]*?)(?=\s(?:4[.、)]|④)\s*)\s*(?:4[.、)]|④)\s*([\s\S]*)$/;
+  const match = normalized.match(numberedPattern);
+
+  if (!match) {
+    return { text: normalized, suggestions: [] };
+  }
+
+  const inlineBlock = match[0] || '';
+  const replyText = normalized.slice(0, normalized.length - inlineBlock.length).trim();
+  const suggestions = match
+    .slice(1)
+    .map((item) => item.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim())
+    .filter(Boolean);
+
+  return {
+    text: replyText || normalized.replace(inlineBlock, '').trim(),
+    suggestions,
+  };
+};
+
+const normalizeChatPayload = (payload = {}, fallbackResponse = {}, currentTurn = 0) => {
+  const fallbackText = fallbackResponse.text || '';
+  const fallbackSuggestions = Array.isArray(fallbackResponse.suggestions) ? fallbackResponse.suggestions : [];
+  const rawText = payload.text || payload.reply || payload.message || payload.response || fallbackText;
+  const cleaned = stripInlineSuggestions(rawText);
+  const payloadSuggestions = Array.isArray(payload.suggestions)
+    ? payload.suggestions.filter((item) => typeof item === 'string' && item.trim())
+    : [];
+  const suggestions = [...(payloadSuggestions.length > 0 ? payloadSuggestions : cleaned.suggestions)];
+
+  for (const fallbackSuggestion of fallbackSuggestions) {
+    if (suggestions.length >= 4) break;
+    if (!suggestions.includes(fallbackSuggestion)) {
+      suggestions.push(fallbackSuggestion);
+    }
+  }
+
+  return {
+    text: cleaned.text || fallbackText,
+    suggestions: suggestions.slice(0, 4),
+    visual_tags: Array.isArray(payload.visual_tags)
+      ? payload.visual_tags.filter((item) => typeof item === 'string' && item.trim())
+      : [],
+    current_turn: Math.min(Math.max(Number(payload.current_turn || Number(currentTurn || 0) + 1), 1), MAX_CHAT_TURNS),
   };
 };
 
@@ -730,8 +662,8 @@ const createDemoResponse = (name, currentTurn, language = 'zh') => {
 
   return {
     text: language === 'zh'
-      ? `(演示模式) ${name || '朋友'}，我听见了。${demoQuestions[turn - 1]}`
-      : `(Demo mode) I hear you, ${name || 'friend'}. ${demoQuestions[turn - 1]}`,
+      ? `${name || '朋友'}，我听见了。${demoQuestions[turn - 1]}`
+      : `I hear you, ${name || 'friend'}. ${demoQuestions[turn - 1]}`,
     suggestions: turn >= MAX_CHAT_TURNS
       ? [language === 'zh' ? '面对未来的理想自己' : 'Meet your ideal future self']
       : demoSuggestions,
@@ -821,20 +753,25 @@ const handleChatStream = async (res, body) => {
   const transcript = safeHistory
     .map((entry) => `${entry.sender === 'user' ? 'User' : 'Future Self'}: ${entry.text}`)
     .join('\n');
-  let pendingStreamText = '';
-  let shouldHoldStream = null;
 
-  const streamedReply = await callTextModelStream({
+  const content = await callTextModel({
     messages: [
       {
         role: 'system',
         content: `${buildSystemPrompt(userData, promptSettings)}
 
-Respond with only the next reply text from the future self.
-Do not return JSON.
-Do not label the speaker.
-Do not include suggestions or analysis.
-Keep the tone warm, concise, and conversational.`,
+Return valid json only, with this exact shape:
+{
+  "text": "string",
+  "suggestions": ["exactly 4 choice-first possible user answers"],
+  "visual_tags": ["english visual tag"],
+  "current_turn": 1
+}
+
+Important:
+- Put only the assistant reply in "text".
+- Do not include numbered options, suggestions, or a menu inside "text".
+- Put all selectable options only inside "suggestions".`,
       },
       {
         role: 'user',
@@ -849,82 +786,21 @@ Previous current_turn: ${currentTurn}
 `,
       },
     ],
-    maxTokens: 900,
-    onDelta: (delta) => {
-      pendingStreamText += delta;
-
-      if (shouldHoldStream === null) {
-        const visibleText = pendingStreamText.trimStart();
-        const firstVisibleChar = visibleText[0];
-        if (!firstVisibleChar) return;
-
-        shouldHoldStream = firstVisibleChar === '{' || firstVisibleChar === '[' || visibleText.startsWith('```');
-        if (!shouldHoldStream) {
-          writeStreamEvent(res, { type: 'text_delta', delta: pendingStreamText });
-          pendingStreamText = '';
-        }
-        return;
-      }
-
-      if (!shouldHoldStream) {
-        writeStreamEvent(res, { type: 'text_delta', delta });
-      }
-    },
+    responseFormat: { type: 'json_object' },
+    maxTokens: 1200,
   });
 
-  const normalizedReply = extractChatReplyContent(streamedReply || '');
-  const replyText = normalizedReply.text || createDemoResponse(name, currentTurn, language).text;
-
-  if (shouldHoldStream) {
-    writeStreamEvent(res, { type: 'text_delta', delta: replyText });
+  let parsed;
+  try {
+    parsed = JSON.parse(cleanJsonString(content || '{}'));
+  } catch (e) {
+    console.error('Chat stream JSON parse error', e);
+    parsed = extractChatReplyContent(content || '');
   }
 
-  let parsed = normalizedReply.metadata;
+  const finalResponse = normalizeChatPayload(parsed, createDemoResponse(name, currentTurn, language), currentTurn);
 
-  if (!parsed || !Array.isArray(parsed.suggestions)) {
-    const metadataContent = await callTextModel({
-      messages: [
-        {
-          role: 'system',
-          content: createChatMetadataPrompt({ currentTurn, assistantReply: replyText, language }),
-        },
-        {
-          role: 'user',
-          content: `
-Conversation history:
-${transcript || '(no previous history)'}
-
-Latest user message:
-${message}
-
-Assistant reply:
-${replyText}
-`,
-        },
-      ],
-      responseFormat: { type: 'json_object' },
-      maxTokens: 500,
-    });
-
-    try {
-      parsed = JSON.parse(cleanJsonString(metadataContent || '{}'));
-    } catch (e) {
-      console.error('Chat metadata JSON parse error', e);
-      parsed = createDemoResponse(name, currentTurn, language);
-    }
-  }
-
-  const finalResponse = {
-    text: replyText,
-    suggestions: Array.isArray(parsed.suggestions)
-      ? parsed.suggestions.filter((item) => typeof item === 'string' && item.trim()).slice(0, 4)
-      : [],
-    visual_tags: Array.isArray(parsed.visual_tags)
-      ? parsed.visual_tags.filter((item) => typeof item === 'string' && item.trim())
-      : [],
-    current_turn: Math.min(Math.max(Number(parsed.current_turn || Number(currentTurn || 0) + 1), 1), MAX_CHAT_TURNS),
-  };
-
+  writeStreamEvent(res, { type: 'text_delta', delta: finalResponse.text });
   writeStreamEvent(res, { type: 'done', data: finalResponse });
 };
 

@@ -217,8 +217,8 @@ const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
 
   return {
     text: language === 'zh'
-      ? `(演示模式) ${name}，我听见了。${demoQuestions[currentTurn - 1]}`
-      : `(Demo mode) I hear you, ${name}. ${demoQuestions[currentTurn - 1]}`,
+      ? `${name}，我听见了。${demoQuestions[currentTurn - 1]}`
+      : `I hear you, ${name}. ${demoQuestions[currentTurn - 1]}`,
     suggestions: currentTurn >= MAX_CHAT_TURNS
       ? [language === 'zh' ? '面对未来的理想自己' : 'Meet your ideal future self']
       : demoSuggestions,
