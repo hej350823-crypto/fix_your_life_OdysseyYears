@@ -39,6 +39,11 @@ const MAX_CHAT_TURNS = 6;
 const ADMIN_TOKEN_STORAGE_KEY = 'fix-your-life.admin-token.v1';
 const STREAM_IDLE_TIMEOUT_MS = 15000;
 
+const withoutPhoto = (userData: UserData): UserData => ({
+  ...userData,
+  photo: null,
+});
+
 const hasCustomPromptSettings = (promptSettings?: PromptSettings) => {
   if (!promptSettings) return false;
 
@@ -225,28 +230,6 @@ const postAiActionStream = async (
   }
 };
 
-const postChatWithStreamFallback = async (
-  payload: Record<string, unknown>,
-  onEvent: (event: ChatStreamEvent) => void,
-): Promise<ChatResponse> => {
-  try {
-    return await postAiActionStream('chat-stream', payload, onEvent);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    const canFallback = message.includes('timed out')
-      || message.includes('Streaming response body is unavailable')
-      || message.includes('Streaming response ended before completion')
-      || message.includes('Load failed')
-      || message.includes('Failed to fetch');
-
-    if (!canFallback) {
-      throw error;
-    }
-
-    return postAiAction<ChatResponse>('chat', payload);
-  }
-};
-
 const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
   const currentTurn = Math.min(Math.max(turn, 1), MAX_CHAT_TURNS);
   const language = userData.language || 'zh';
@@ -280,6 +263,7 @@ const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
 
 export const createChatSession = (userData: UserData, promptSettings?: PromptSettings): ChatSession => {
   const history: Message[] = [];
+  const textUserData = withoutPhoto(userData);
   let localTurn = 0;
 
   return {
@@ -299,8 +283,8 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
       }
 
       try {
-        const response = await postChatWithStreamFallback({
-          userData,
+        const response = await postAiActionStream('chat-stream', {
+          userData: textUserData,
           message: msg,
           history,
           currentTurn: localTurn,
@@ -398,7 +382,7 @@ export const generateUserPersonaProfile = async (
 ): Promise<UserPersonaProfile> => {
   try {
     const response = await postAiAction<{ personaProfile: UserPersonaProfile }>('user-persona', {
-      userData,
+      userData: withoutPhoto(userData),
       chatHistorySummary,
       language,
       promptSettings,

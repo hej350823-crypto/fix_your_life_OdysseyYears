@@ -33,6 +33,11 @@ const createApiError = (message, statusCode = 500, meta = {}) => Object.assign(n
   ...meta,
 });
 
+const withoutPhoto = (userData = {}) => ({
+  ...userData,
+  photo: null,
+});
+
 const getNetworkHint = ({ providerName, baseUrl, diagnostics }) => {
   const prefix = providerName === 'DeepSeek' ? 'DeepSeek' : 'Ark';
 
@@ -111,6 +116,7 @@ const getTextProvider = () => {
       baseUrl: DEEPSEEK_BASE_URL,
       model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
       name: 'DeepSeek',
+      supportsThinkingToggle: true,
     };
   }
 
@@ -122,6 +128,7 @@ const getTextProvider = () => {
       baseUrl: process.env.ARK_TEXT_BASE_URL || process.env.ARK_IMAGE_BASE_URL || DEFAULT_ARK_BASE_URL,
       model: arkTextModel,
       name: 'Ark text',
+      supportsThinkingToggle: false,
     };
   }
 
@@ -148,6 +155,7 @@ const callTextModel = async ({ messages, responseFormat, maxTokens = 1000 }) => 
         response_format: responseFormat,
         max_tokens: maxTokens,
         stream: false,
+        ...(provider.supportsThinkingToggle ? { thinking: { type: 'disabled' } } : {}),
       }),
     });
   } catch (error) {
@@ -182,6 +190,118 @@ const callTextModel = async ({ messages, responseFormat, maxTokens = 1000 }) => 
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || '';
+};
+
+const readTextStream = async (response, onTextDelta) => {
+  const decoder = new TextDecoder();
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw createApiError('Streaming response body is unavailable.', 502, {
+      errorType: 'upstream',
+      hint: '上游模型没有返回可读取的流式响应。',
+    });
+  }
+
+  let buffer = '';
+  let fullText = '';
+
+  const consumeLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('data:')) return;
+
+    const payload = trimmed.replace(/^data:\s*/, '');
+    if (!payload || payload === '[DONE]') return;
+
+    let event;
+    try {
+      event = JSON.parse(payload);
+    } catch (error) {
+      console.warn('Could not parse text stream event', error);
+      return;
+    }
+
+    const delta = event.choices?.[0]?.delta?.content
+      || event.choices?.[0]?.message?.content
+      || '';
+
+    if (delta) {
+      fullText += delta;
+      onTextDelta(delta);
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    lines.forEach(consumeLine);
+
+    if (done) break;
+  }
+
+  if (buffer.trim()) {
+    consumeLine(buffer);
+  }
+
+  return fullText;
+};
+
+const callTextModelStream = async ({ messages, responseFormat, maxTokens = 1000, onTextDelta }) => {
+  const provider = getTextProvider();
+  if (!provider) {
+    return null;
+  }
+
+  let response;
+  try {
+    response = await networkFetch(`${provider.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${provider.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        messages,
+        response_format: responseFormat,
+        max_tokens: maxTokens,
+        stream: true,
+        ...(provider.supportsThinkingToggle ? { thinking: { type: 'disabled' } } : {}),
+      }),
+    });
+  } catch (error) {
+    const diagnostics = await getNetworkDiagnostics(provider.baseUrl).catch(() => null);
+    throw createApiError(
+      `${provider.name} API stream request failed: ${error?.message || 'fetch failed'}`,
+      502,
+      {
+        provider: provider.name,
+        baseUrl: provider.baseUrl,
+        ...getFetchErrorMeta({ providerName: provider.name, baseUrl: provider.baseUrl, diagnostics }),
+      },
+    );
+  }
+
+  if (!response.ok) {
+    const detail = await response.text();
+    const meta = getResponseErrorMeta({
+      providerName: provider.name,
+      status: response.status,
+      detail,
+      action: 'text-stream',
+    });
+    throw createApiError(`${provider.name} API stream request failed: ${response.status} ${detail}`, response.status, {
+      provider: provider.name,
+      baseUrl: provider.baseUrl,
+      upstreamStatus: response.status,
+      upstreamDetail: detail,
+      ...meta,
+    });
+  }
+
+  return readTextStream(response, onTextDelta);
 };
 
 const callArkImage = async ({ prompt, referenceImage }) => {
@@ -318,10 +438,13 @@ const sendStreamHeaders = (res) => {
   res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
 };
 
 const writeStreamEvent = (res, payload) => {
   res.write(`${JSON.stringify(payload)}\n`);
+  res.flush?.();
 };
 
 const escapeHtml = (value = '') => value
@@ -378,6 +501,15 @@ const stripInlineSuggestions = (text = '') => {
     text: replyText || normalized.replace(inlineBlock, '').trim(),
     suggestions,
   };
+};
+
+const getStreamVisibleText = (text = '') => {
+  const suggestionStartMatch = String(text).match(/(?:^|\n)\s*(?:1[.、)]|①)\s+/);
+  if (!suggestionStartMatch || typeof suggestionStartMatch.index !== 'number') {
+    return text;
+  }
+
+  return text.slice(0, suggestionStartMatch.index).trimEnd();
 };
 
 const normalizeChatPayload = (payload = {}, fallbackResponse = {}, currentTurn = 0) => {
@@ -673,7 +805,8 @@ const createDemoResponse = (name, currentTurn, language = 'zh') => {
 };
 
 const handleChat = async (body) => {
-  const { userData, message, history = [], currentTurn = 0, promptSettings } = body;
+  const { message, history = [], currentTurn = 0, promptSettings } = body;
+  const userData = withoutPhoto(body.userData || {});
   const safeHistory = Array.isArray(history) ? history.slice(-12) : [];
   const name = userData?.name || '朋友';
 
@@ -734,7 +867,8 @@ Return valid json only, with this exact shape:
 };
 
 const handleChatStream = async (res, body) => {
-  const { userData, message, history = [], currentTurn = 0, promptSettings } = body;
+  const { message, history = [], currentTurn = 0, promptSettings } = body;
+  const userData = withoutPhoto(body.userData || {});
   const safeHistory = Array.isArray(history) ? history.slice(-12) : [];
   const language = userData?.language || 'zh';
   const name = userData?.name || '朋友';
@@ -754,24 +888,30 @@ const handleChatStream = async (res, body) => {
     .map((entry) => `${entry.sender === 'user' ? 'User' : 'Future Self'}: ${entry.text}`)
     .join('\n');
 
-  const content = await callTextModel({
+  let streamedContent = '';
+  let sentVisibleLength = 0;
+
+  const content = await callTextModelStream({
     messages: [
       {
         role: 'system',
         content: `${buildSystemPrompt(userData, promptSettings)}
 
-Return valid json only, with this exact shape:
-{
-  "text": "string",
-  "suggestions": ["exactly 4 choice-first possible user answers"],
-  "visual_tags": ["english visual tag"],
-  "current_turn": 1
-}
+For this streaming endpoint, override any earlier JSON-only output instruction. Return plain text only.
+
+Format:
+1. Start directly with the assistant reply. Do not wrap it in JSON or markdown.
+2. After the reply, include exactly four short selectable user answers in this numbered format:
+1. option
+2. option
+3. option
+4. option
 
 Important:
-- Put only the assistant reply in "text".
-- Do not include numbered options, suggestions, or a menu inside "text".
-- Put all selectable options only inside "suggestions".`,
+- The reply should feel like a future self speaking warmly to the user.
+- Keep the four options choice-first and easy to tap.
+- Do not include labels like "suggestions" or "options".
+- Do not output JSON, markdown, code fences, or object keys like "text" / "suggestions".`,
       },
       {
         role: 'user',
@@ -786,26 +926,38 @@ Previous current_turn: ${currentTurn}
 `,
       },
     ],
-    responseFormat: { type: 'json_object' },
     maxTokens: 1200,
+    onTextDelta: (delta) => {
+      streamedContent += delta;
+      const visibleText = getStreamVisibleText(streamedContent);
+      const nextDelta = visibleText.slice(sentVisibleLength);
+      sentVisibleLength = visibleText.length;
+
+      if (nextDelta) {
+        writeStreamEvent(res, { type: 'text_delta', delta: nextDelta });
+      }
+    },
   });
 
   let parsed;
-  try {
-    parsed = JSON.parse(cleanJsonString(content || '{}'));
-  } catch (e) {
-    console.error('Chat stream JSON parse error', e);
-    parsed = extractChatReplyContent(content || '');
+  const trimmedContent = String(content || '').trim();
+  if (trimmedContent.startsWith('{') || trimmedContent.startsWith('[')) {
+    try {
+      parsed = JSON.parse(cleanJsonString(trimmedContent));
+    } catch (e) {
+      console.warn('Chat stream looked like JSON but could not be parsed.', e);
+      parsed = extractChatReplyContent(trimmedContent);
+    }
+  } else {
+    parsed = extractChatReplyContent(trimmedContent);
   }
 
   const finalResponse = normalizeChatPayload(parsed, createDemoResponse(name, currentTurn, language), currentTurn);
-
-  writeStreamEvent(res, { type: 'text_delta', delta: finalResponse.text });
   writeStreamEvent(res, { type: 'done', data: finalResponse });
 };
 
 const handleUserPersona = async (body) => {
-  const userData = body.userData || {};
+  const userData = withoutPhoto(body.userData || {});
   const userName = userData.name || '朋友';
   const language = body.language || userData.language || 'zh';
 
