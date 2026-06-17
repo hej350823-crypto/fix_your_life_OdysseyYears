@@ -50,6 +50,8 @@ const getPersonaVisualTags = (tags: unknown): string[] => {
   return tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length > 0);
 };
 
+const TEST_PROFILE_SOURCE = '/test-assets/test-source.png';
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testMode, promptSettings, onBack, onComplete }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -125,7 +127,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
 
       if (testMode || userData.isTestMode) {
         onComplete({
-          imageUrl: '/test-assets/future-self.svg',
+          imageUrl: '/test-assets/future-self.png',
           letter: testCopy.finalLetter,
           conversationSummary,
         });
@@ -215,7 +217,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
                 alt="Reflecting..."
                 decoding="async"
                 className="w-full h-full object-cover transition-all duration-1000 ease-linear"
-                style={{ filter: `blur(${blurLevel}px) contrast(1.1)`, transform: 'scale(1.1)' }}
+                style={{
+                  filter: `blur(${blurLevel}px) contrast(1.1)`,
+                  transform: 'scale(1.1)',
+                  objectPosition: userData.photo === TEST_PROFILE_SOURCE ? 'left center' : 'center',
+                }}
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-stone-100 to-orange-100" />

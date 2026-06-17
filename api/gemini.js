@@ -1,7 +1,10 @@
+import crypto from 'node:crypto';
 import {
+  DEFAULT_PROMPT_SETTINGS,
   buildCurrentImagePrompt,
   buildImagePrompt,
   buildLetterPrompt,
+  mergePromptSettings,
   buildSystemPrompt,
   buildTimeCapsulePrompt,
   buildUserPersonaPrompt,
@@ -14,6 +17,15 @@ const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
 const RESEND_BASE_URL = 'https://api.resend.com';
 const MAX_CHAT_TURNS = 6;
+const ADMIN_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+const rateLimitStore = new Map();
+const RATE_LIMIT_RULES = {
+  'admin-auth': { limit: 5, windowMs: 10 * 60 * 1000, label: '后台密码验证' },
+  'future-portrait': { limit: 8, windowMs: 10 * 60 * 1000, label: '未来画像生成' },
+  'current-portrait': { limit: 8, windowMs: 10 * 60 * 1000, label: '当前画像生成' },
+  chat: { limit: 40, windowMs: 10 * 60 * 1000, label: '对话请求' },
+  default: { limit: 30, windowMs: 10 * 60 * 1000, label: 'AI 请求' },
+};
 
 const createApiError = (message, statusCode = 500, meta = {}) => Object.assign(new Error(message), {
   statusCode,
@@ -69,6 +81,27 @@ const getFetchErrorMeta = ({ providerName, baseUrl, diagnostics }) => ({
   errorType: 'network',
   hint: getNetworkHint({ providerName, baseUrl, diagnostics }),
 });
+
+const remoteImageUrlToDataUrl = async (imageUrl) => {
+  if (typeof imageUrl !== 'string' || !/^https?:\/\//i.test(imageUrl)) {
+    return imageUrl;
+  }
+
+  try {
+    // Some providers return short-lived or anti-hotlink image URLs.
+    // Converting them server-side makes the browser render path stable.
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      return imageUrl;
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  } catch {
+    return imageUrl;
+  }
+};
 
 const getTextProvider = () => {
   if (process.env.DEEPSEEK_API_KEY) {
@@ -220,7 +253,7 @@ const callArkImage = async ({ prompt, referenceImage }) => {
 
   const data = await response.json();
   const firstImage = data.data?.[0] || data.images?.[0] || data.result?.data?.[0];
-  if (firstImage?.url) return firstImage.url;
+  if (firstImage?.url) return remoteImageUrlToDataUrl(firstImage.url);
   if (firstImage?.b64_json) return `data:image/png;base64,${firstImage.b64_json}`;
   if (typeof firstImage === 'string') return firstImage;
   return null;
@@ -234,6 +267,37 @@ const cleanJsonString = (value = '') => {
     cleaned = cleaned.replace(/^```/, '').replace(/```$/, '');
   }
   return cleaned.trim() || '{}';
+};
+
+const base64UrlEncode = (value) => Buffer.from(value, 'utf8').toString('base64url');
+const base64UrlDecode = (value) => Buffer.from(value, 'base64url').toString('utf8');
+
+const getRequestIp = (req) => {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+    return forwardedFor.split(',')[0].trim();
+  }
+
+  return req.socket?.remoteAddress || 'unknown';
+};
+
+const enforceRateLimit = (req, action = 'default') => {
+  const rule = RATE_LIMIT_RULES[action] || RATE_LIMIT_RULES.default;
+  const clientIp = getRequestIp(req);
+  const key = `${action}:${clientIp}`;
+  const now = Date.now();
+  const attempts = rateLimitStore.get(key) || [];
+  const recentAttempts = attempts.filter((timestamp) => now - timestamp < rule.windowMs);
+
+  if (recentAttempts.length >= rule.limit) {
+    throw createApiError(`${rule.label}过于频繁，请稍后再试。`, 429, {
+      errorType: 'rate_limit',
+      hint: `${rule.label}在短时间内次数过多。请过几分钟再试。`,
+    });
+  }
+
+  recentAttempts.push(now);
+  rateLimitStore.set(key, recentAttempts);
 };
 
 const serializePersonaForPrompt = (personaProfile) => {
@@ -259,6 +323,67 @@ const formatCapsuleMessageHtml = (message = '') => escapeHtml(message).replace(/
 
 const isValidEmail = (email = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const getAdminPassword = () => process.env.ADMIN_PASSWORD || process.env.PROMPT_ADMIN_PASSWORD || '';
+const hasCustomPromptSettings = (promptSettings) => {
+  if (!promptSettings || typeof promptSettings !== 'object') return false;
+
+  return (Object.keys(DEFAULT_PROMPT_SETTINGS))
+    .some((key) => promptSettings[key] !== DEFAULT_PROMPT_SETTINGS[key]);
+};
+
+const signAdminToken = (payload, secret) => crypto
+  .createHmac('sha256', secret)
+  .update(payload)
+  .digest('base64url');
+
+const createAdminToken = () => {
+  const secret = getAdminPassword();
+  const payload = JSON.stringify({ exp: Date.now() + ADMIN_TOKEN_TTL_MS });
+  const encodedPayload = base64UrlEncode(payload);
+  const signature = signAdminToken(encodedPayload, secret);
+  return `${encodedPayload}.${signature}`;
+};
+
+const verifyAdminToken = (token = '') => {
+  const secret = getAdminPassword();
+  if (!secret || !token || typeof token !== 'string') {
+    return false;
+  }
+
+  const [encodedPayload, providedSignature] = token.split('.');
+  if (!encodedPayload || !providedSignature) {
+    return false;
+  }
+
+  const expectedSignature = signAdminToken(encodedPayload, secret);
+  const providedBuffer = Buffer.from(providedSignature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+
+  if (providedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(providedBuffer, expectedBuffer)) {
+    return false;
+  }
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+    return typeof payload.exp === 'number' && payload.exp > Date.now();
+  } catch {
+    return false;
+  }
+};
+
+const getAuthorizedPromptSettings = (body) => {
+  if (!hasCustomPromptSettings(body.promptSettings)) {
+    return undefined;
+  }
+
+  if (!verifyAdminToken(body.adminToken)) {
+    throw createApiError('Custom prompt settings require admin verification.', 401, {
+      errorType: 'auth',
+      hint: '自定义提示词需要先重新输入后台密码验证。',
+    });
+  }
+
+  return mergePromptSettings(body.promptSettings);
+};
 
 const buildTimeCapsuleEmail = ({ userName, message, imageUrl, sendAt, language }) => {
   const safeName = escapeHtml(userName || (language === 'zh' ? '朋友' : 'friend'));
@@ -728,14 +853,19 @@ const handleAdminAuth = async (body) => {
   }
 
   const providedPassword = typeof body.password === 'string' ? body.password : '';
-  if (providedPassword !== configuredPassword) {
+  const providedBuffer = Buffer.from(providedPassword);
+  const configuredBuffer = Buffer.from(configuredPassword);
+  const passwordMatches = providedBuffer.length === configuredBuffer.length
+    && crypto.timingSafeEqual(providedBuffer, configuredBuffer);
+
+  if (!passwordMatches) {
     throw createApiError('Invalid admin password.', 401, {
       errorType: 'auth',
       hint: '密码不正确，请再试一次。',
     });
   }
 
-  return { ok: true };
+  return { ok: true, adminToken: createAdminToken() };
 };
 
 const handleTimeCapsule = async (body) => {
@@ -800,36 +930,40 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const action = typeof body?.action === 'string' ? body.action : 'default';
 
-    if (body.action === 'chat') {
+    enforceRateLimit(req, action);
+    body.promptSettings = getAuthorizedPromptSettings(body);
+
+    if (action === 'chat') {
       return sendJson(res, 200, await handleChat(body));
     }
 
-    if (body.action === 'final-letter') {
+    if (action === 'final-letter') {
       return sendJson(res, 200, await handleFinalLetter(body));
     }
 
-    if (body.action === 'user-persona') {
+    if (action === 'user-persona') {
       return sendJson(res, 200, await handleUserPersona(body));
     }
 
-    if (body.action === 'time-capsule-letter') {
+    if (action === 'time-capsule-letter') {
       return sendJson(res, 200, await handleTimeCapsuleLetter(body));
     }
 
-    if (body.action === 'future-portrait') {
+    if (action === 'future-portrait') {
       return sendJson(res, 200, await handleFuturePortrait(body));
     }
 
-    if (body.action === 'current-portrait') {
+    if (action === 'current-portrait') {
       return sendJson(res, 200, await handleCurrentPortrait(body));
     }
 
-    if (body.action === 'admin-auth') {
+    if (action === 'admin-auth') {
       return sendJson(res, 200, await handleAdminAuth(body));
     }
 
-    if (body.action === 'time-capsule') {
+    if (action === 'time-capsule') {
       return sendJson(res, 200, await handleTimeCapsule(body));
     }
 

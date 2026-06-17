@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { t } from '../i18n';
 import { Language, UserData } from '../types';
 
@@ -10,6 +10,7 @@ interface OnboardingProps {
 }
 
 const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName = '', onComplete }) => {
+  const TEST_PROFILE_SOURCE = '/test-assets/test-source.png';
   const normalizedInitialName = initialName.trim();
   const [step, setStep] = useState<0 | 1 | 2>(normalizedInitialName ? 1 : 0);
   const [name, setName] = useState(normalizedInitialName);
@@ -25,6 +26,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
   const testProfile = t(language).test.profile;
   const allPainPointOptions = text.painPointGroups.flatMap((group) => group.options);
   const previewPoint = allPainPointOptions.find((option) => option.title === (hoveredPoint || focusedPoint)) || null;
+
+  useEffect(() => {
+    if (!testMode && loadedTestProfile) {
+      setLoadedTestProfile(false);
+    }
+  }, [testMode, loadedTestProfile]);
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +75,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
         painPoints: selectedPoints,
         photo,
         language,
-        isTestMode: testMode || loadedTestProfile,
+        isTestMode: testMode,
       });
     }, 800);
   };
@@ -238,6 +245,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                     alt="Current State"
                     decoding="async"
                     className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-[1.03]"
+                    style={{ objectPosition: photo === TEST_PROFILE_SOURCE ? 'left center' : 'center' }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-orange-100/12 via-transparent to-white/10 pointer-events-none" />
                 </>

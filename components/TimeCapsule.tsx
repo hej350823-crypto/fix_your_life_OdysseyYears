@@ -65,7 +65,7 @@ const TimeCapsule: React.FC<TimeCapsuleProps> = ({
     setStatus('saving');
     try {
       const [message, imageUrl] = isTestMode
-        ? [testCopy.timeCapsuleLetter, '/test-assets/current-self.svg']
+        ? [testCopy.timeCapsuleLetter, '/test-assets/test-source.png']
         : await Promise.all([
             generateTimeCapsuleLetter(userName, conversationSummary, language, promptSettings, personaProfile),
             generateCurrentSelfPortrait(userName, personaProfile, promptSettings, userPhoto),

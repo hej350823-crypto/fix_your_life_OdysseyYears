@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { DEFAULT_PROMPT_SETTINGS, mergePromptSettings } from './config/promptSettings';
+import { setAdminToken } from './services/geminiService';
 import { GenerationResult, Language, PromptSettings, UserData, ViewState } from './types';
 import AdminPanel from './components/AdminPanel';
 import AppControls from './components/AppControls';
@@ -82,11 +83,7 @@ const App: React.FC = () => {
   };
 
   const openAdmin = () => {
-    if (isAdminAuthenticated) {
-      setViewState(ViewState.ADMIN);
-      return;
-    }
-
+    setIsAdminAuthenticated(false);
     setAdminPassword('');
     setAdminAuthError('');
     setIsAdminAuthOpen(true);
@@ -121,6 +118,8 @@ const App: React.FC = () => {
         throw new Error(detail?.hint || detail?.error || (language === 'zh' ? '验证失败，请重试。' : 'Authentication failed. Please try again.'));
       }
 
+      const detail = await response.json().catch(() => null) as { adminToken?: string } | null;
+      setAdminToken(detail?.adminToken || null);
       setIsAdminAuthenticated(true);
       setIsAdminAuthOpen(false);
       setAdminPassword('');
@@ -150,7 +149,10 @@ const App: React.FC = () => {
         promptSettings={promptSettings}
         onSave={savePromptSettings}
         onReset={resetPromptSettings}
-        onBack={() => setViewState(ViewState.LANDING)}
+        onBack={() => {
+          setIsAdminAuthenticated(false);
+          setViewState(ViewState.LANDING);
+        }}
       />
     );
   }

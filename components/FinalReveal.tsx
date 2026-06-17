@@ -10,6 +10,8 @@ interface FinalRevealProps {
   onContinue: () => void;
 }
 
+const TEST_FUTURE_IMAGE = '/test-assets/future-self.png';
+
 const FinalReveal: React.FC<FinalRevealProps> = ({ result, userName, language, onRestart, onContinue }) => {
   const text = t(language).final;
   const received = text.received.replace('{year}', String(new Date().getFullYear() + 5));
@@ -35,6 +37,7 @@ const FinalReveal: React.FC<FinalRevealProps> = ({ result, userName, language, o
                 loading="lazy"
                 decoding="async"
                 className="relative z-10 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                style={{ objectPosition: result.imageUrl === TEST_FUTURE_IMAGE ? 'center' : 'center' }}
                 alt="Future Self"
               />
               <div className="absolute bottom-6 left-0 right-0 text-center z-20">

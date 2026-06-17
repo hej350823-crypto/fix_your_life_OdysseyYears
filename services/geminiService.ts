@@ -1,3 +1,4 @@
+import { DEFAULT_PROMPT_SETTINGS } from '../config/promptSettings';
 import { Language, Message, PromptSettings, UserData, UserPersonaProfile } from '../types';
 import { getTestData } from '../mock/testData';
 
@@ -22,8 +23,32 @@ type ApiErrorResponse = {
   upstreamStatus?: number | null;
 };
 
-const fallbackImage = '/test-assets/future-self.svg';
+const fallbackImage = '/test-assets/future-self.png';
 const MAX_CHAT_TURNS = 6;
+const ADMIN_TOKEN_STORAGE_KEY = 'fix-your-life.admin-token.v1';
+
+const hasCustomPromptSettings = (promptSettings?: PromptSettings) => {
+  if (!promptSettings) return false;
+
+  return (Object.keys(DEFAULT_PROMPT_SETTINGS) as Array<keyof PromptSettings>)
+    .some((key) => promptSettings[key] !== DEFAULT_PROMPT_SETTINGS[key]);
+};
+
+const getAdminToken = () => {
+  if (typeof window === 'undefined') return '';
+  return window.sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '';
+};
+
+export const setAdminToken = (token: string | null) => {
+  if (typeof window === 'undefined') return;
+
+  if (token) {
+    window.sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+    return;
+  }
+
+  window.sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+};
 
 const formatApiErrorMessage = (detail: ApiErrorResponse | null, status: number) => {
   const headline = detail?.error || `AI API request failed: ${status}`;
@@ -37,6 +62,20 @@ const formatApiErrorMessage = (detail: ApiErrorResponse | null, status: number) 
 };
 
 const postAiAction = async <TResponse>(action: string, payload: Record<string, unknown>): Promise<TResponse> => {
+  const nextPayload = { ...payload };
+  const promptSettings = nextPayload.promptSettings as PromptSettings | undefined;
+
+  if (hasCustomPromptSettings(promptSettings)) {
+    const adminToken = getAdminToken();
+    if (!adminToken) {
+      throw new Error('Prompt admin verification expired. Please re-enter the admin password before using custom prompts.');
+    }
+
+    nextPayload.adminToken = adminToken;
+  } else {
+    delete nextPayload.promptSettings;
+  }
+
   const response = await fetch('/api/gemini', {
     method: 'POST',
     headers: {
@@ -44,7 +83,7 @@ const postAiAction = async <TResponse>(action: string, payload: Record<string, u
     },
     body: JSON.stringify({
       action,
-      ...payload,
+      ...nextPayload,
     }),
   });
 
