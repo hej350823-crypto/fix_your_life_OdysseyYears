@@ -11,6 +11,11 @@ interface OnboardingProps {
 
 const MAX_UPLOAD_EDGE = 1024;
 const UPLOAD_EXPORT_QUALITY = 0.76;
+const PORTRAIT_ASPECT_RATIO = 3 / 4;
+
+type FaceDetectionBox = {
+  boundingBox?: DOMRectReadOnly;
+};
 
 const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName = '', onComplete }) => {
   const TEST_PROFILE_SOURCE = '/test-assets/test-source.png';
@@ -69,24 +74,78 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
     image.src = src;
   });
 
+  const detectFaceFocus = async (image: HTMLImageElement) => {
+    const FaceDetectorConstructor = (window as typeof window & {
+      FaceDetector?: new (options?: { fastMode?: boolean; maxDetectedFaces?: number }) => {
+        detect: (source: HTMLImageElement) => Promise<FaceDetectionBox[]>;
+      };
+    }).FaceDetector;
+
+    if (!FaceDetectorConstructor) {
+      return null;
+    }
+
+    try {
+      const detector = new FaceDetectorConstructor({ fastMode: true, maxDetectedFaces: 1 });
+      const [face] = await detector.detect(image);
+      const box = face?.boundingBox;
+      if (!box) return null;
+
+      return {
+        x: box.x + box.width / 2,
+        y: box.y + box.height * 0.62,
+      };
+    } catch (error) {
+      console.warn('Face detection failed. Falling back to center crop.', error);
+      return null;
+    }
+  };
+
   const compressPhoto = async (file: File) => {
     const sourceDataUrl = await readFileAsDataUrl(file);
     const image = await loadImage(sourceDataUrl);
-    const longestEdge = Math.max(image.naturalWidth, image.naturalHeight);
+    const imageWidth = image.naturalWidth;
+    const imageHeight = image.naturalHeight;
+    const imageAspectRatio = imageWidth / imageHeight;
+    const faceFocus = await detectFaceFocus(image);
+    const focus = faceFocus || {
+      x: imageWidth / 2,
+      y: imageHeight / 2,
+    };
 
-    const scale = Math.min(1, MAX_UPLOAD_EDGE / longestEdge);
-    const width = Math.max(1, Math.round(image.naturalWidth * scale));
-    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const cropWidth = imageAspectRatio > PORTRAIT_ASPECT_RATIO
+      ? imageHeight * PORTRAIT_ASPECT_RATIO
+      : imageWidth;
+    const cropHeight = cropWidth / PORTRAIT_ASPECT_RATIO;
+    const desiredCropLeft = focus.x - cropWidth / 2;
+    const desiredCropTop = faceFocus
+      ? focus.y - cropHeight * 0.36
+      : focus.y - cropHeight / 2;
+    const cropLeft = Math.min(Math.max(0, desiredCropLeft), imageWidth - cropWidth);
+    const cropTop = Math.min(Math.max(0, desiredCropTop), imageHeight - cropHeight);
+
+    const outputHeight = Math.max(1, Math.round(Math.min(MAX_UPLOAD_EDGE, cropHeight)));
+    const outputWidth = Math.max(1, Math.round(outputHeight * PORTRAIT_ASPECT_RATIO));
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
 
     const context = canvas.getContext('2d');
     if (!context) {
       return sourceDataUrl;
     }
 
-    context.drawImage(image, 0, 0, width, height);
+    context.drawImage(
+      image,
+      cropLeft,
+      cropTop,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      outputWidth,
+      outputHeight,
+    );
     return canvas.toDataURL('image/jpeg', UPLOAD_EXPORT_QUALITY);
   };
 
