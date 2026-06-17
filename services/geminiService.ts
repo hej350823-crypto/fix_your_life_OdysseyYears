@@ -225,6 +225,28 @@ const postAiActionStream = async (
   }
 };
 
+const postChatWithStreamFallback = async (
+  payload: Record<string, unknown>,
+  onEvent: (event: ChatStreamEvent) => void,
+): Promise<ChatResponse> => {
+  try {
+    return await postAiActionStream('chat-stream', payload, onEvent);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const canFallback = message.includes('timed out')
+      || message.includes('Streaming response body is unavailable')
+      || message.includes('Streaming response ended before completion')
+      || message.includes('Load failed')
+      || message.includes('Failed to fetch');
+
+    if (!canFallback) {
+      throw error;
+    }
+
+    return postAiAction<ChatResponse>('chat', payload);
+  }
+};
+
 const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
   const currentTurn = Math.min(Math.max(turn, 1), MAX_CHAT_TURNS);
   const language = userData.language || 'zh';
@@ -277,7 +299,7 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
       }
 
       try {
-        const response = await postAiActionStream('chat-stream', {
+        const response = await postChatWithStreamFallback({
           userData,
           message: msg,
           history,
