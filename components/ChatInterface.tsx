@@ -10,6 +10,9 @@ import { t } from '../i18n';
 import { ConversationStage, GenerationResult, Language, Message, PromptSettings, UserData } from '../types';
 
 const MAX_CHAT_TURNS = 6;
+const STREAM_MIN_CHARS_PER_TICK = 1;
+const STREAM_MAX_CHARS_PER_TICK = 3;
+const STREAM_TICK_MS = 42;
 
 interface ChatInterfaceProps {
   userData: UserData;
@@ -52,6 +55,10 @@ const getPersonaVisualTags = (tags: unknown): string[] => {
 
 const TEST_PROFILE_SOURCE = '/test-assets/test-source.png';
 
+const wait = (ms: number) => new Promise((resolve) => {
+  window.setTimeout(resolve, ms);
+});
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testMode, promptSettings, onBack, onComplete }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -65,6 +72,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   const collectedTagsRef = useRef<Set<string>>(new Set());
   const chatSession = useRef<ChatSession | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const streamControllerRef = useRef(0);
   const text = t(language).chat;
   const testCopy = t(language).test;
 
@@ -86,24 +94,79 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
     });
   };
 
+  const createDisplayStream = () => {
+    const streamId = streamControllerRef.current + 1;
+    streamControllerRef.current = streamId;
+    let queuedText = '';
+    let displayedText = '';
+    let isClosed = false;
+    let drainPromise: Promise<void> | null = null;
+
+    const drain = async () => {
+      while (streamControllerRef.current === streamId && (!isClosed || queuedText.length > 0)) {
+        if (queuedText.length === 0) {
+          await wait(STREAM_TICK_MS);
+          continue;
+        }
+
+        const nextSize = Math.min(
+          queuedText.length,
+          Math.max(STREAM_MIN_CHARS_PER_TICK, Math.min(STREAM_MAX_CHARS_PER_TICK, Math.ceil(queuedText.length / 18))),
+        );
+        displayedText += queuedText.slice(0, nextSize);
+        queuedText = queuedText.slice(nextSize);
+        upsertLastAiMessage(displayedText);
+        await wait(STREAM_TICK_MS);
+      }
+    };
+
+    const ensureDrain = () => {
+      if (!drainPromise) {
+        drainPromise = drain();
+      }
+      return drainPromise;
+    };
+
+    return {
+      push: (chunk: string) => {
+        queuedText += chunk;
+        void ensureDrain();
+      },
+      finish: async (finalText: string, audioBase64?: string) => {
+        queuedText = finalText.slice(displayedText.length);
+        isClosed = true;
+        await ensureDrain();
+
+        if (streamControllerRef.current === streamId) {
+          upsertLastAiMessage(finalText, audioBase64);
+        }
+      },
+      cancel: () => {
+        isClosed = true;
+      },
+    };
+  };
+
   useEffect(() => {
     let cancelled = false;
+    let displayStream: ReturnType<typeof createDisplayStream> | null = null;
 
     const init = async () => {
       chatSession.current = createChatSession(userData, promptSettings);
       setIsTyping(true);
       try {
-        let streamedText = '';
+        displayStream = createDisplayStream();
         const welcomeData = await chatSession.current.sendMessage(`(System: User arrived. Name: ${userData.name}. Start Turn 1.)`, {
           onTextChunk: (chunk) => {
             if (cancelled) return;
-            streamedText += chunk;
-            upsertLastAiMessage(streamedText);
+            displayStream?.push(chunk);
           },
         });
         if (cancelled) return;
 
-        upsertLastAiMessage(welcomeData.text, welcomeData.audioBase64);
+        await displayStream.finish(welcomeData.text, welcomeData.audioBase64);
+        if (cancelled) return;
+
         setCurrentSuggestions(welcomeData.suggestions || []);
         collectVisualTags(welcomeData.visual_tags, collectedTagsRef.current);
         setTurnCount(welcomeData.current_turn || 1);
@@ -117,6 +180,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
     init();
     return () => {
       cancelled = true;
+      displayStream?.cancel();
     };
   }, [userData, promptSettings]);
 
@@ -141,17 +205,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
     setIsTyping(true);
 
     try {
-      let streamedText = '';
+      const displayStream = createDisplayStream();
       const response = await chatSession.current.sendMessage(textToSend, {
         onTextChunk: (chunk) => {
-          streamedText += chunk;
-          upsertLastAiMessage(streamedText);
+          displayStream.push(chunk);
         },
       });
 
       collectVisualTags(response.visual_tags, collectedTagsRef.current);
       setTurnCount(response.current_turn || turnCount + 1);
-      upsertLastAiMessage(response.text, response.audioBase64);
+      await displayStream.finish(response.text, response.audioBase64);
       setCurrentSuggestions(response.suggestions || []);
     } catch (error) {
       setMessages((prev) => [
