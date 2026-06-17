@@ -16,8 +16,6 @@ import TimeCapsule from './components/TimeCapsule';
 import { t } from './i18n';
 
 const PROMPT_SETTINGS_STORAGE_KEY = 'fix-your-life.prompt-settings.v3';
-const ADMIN_SESSION_STORAGE_KEY = 'fix-your-life.admin-auth.v1';
-
 const App: React.FC = () => {
   const [viewState, setViewState] = useState<ViewState>(ViewState.LANDING);
   const [language, setLanguage] = useState<Language>('zh');
@@ -40,12 +38,6 @@ const App: React.FC = () => {
       setPromptSettings(mergePromptSettings(JSON.parse(saved)) as PromptSettings);
     } catch (e) {
       console.warn('Prompt settings could not be restored.', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) === 'ok') {
-      setIsAdminAuthenticated(true);
     }
   }, []);
 
@@ -130,7 +122,6 @@ const App: React.FC = () => {
       }
 
       setIsAdminAuthenticated(true);
-      window.sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, 'ok');
       setIsAdminAuthOpen(false);
       setAdminPassword('');
       setViewState(ViewState.ADMIN);
