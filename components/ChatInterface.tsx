@@ -196,7 +196,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, isTyping, currentSuggestions]);
+  }, [messages, isTyping]);
 
   useEffect(() => {
     setStage(conversationStageByTurn(turnCount));
@@ -432,12 +432,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
                 <div className="mb-3 text-center font-sans text-[11px] uppercase tracking-[0.22em] text-stone-400">
                   {text.choiceLead}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                   {currentSuggestions.map((suggestion) => (
                     <button
                       key={suggestion}
                       onClick={() => handleSend(suggestion)}
-                      className="min-h-[64px] rounded-2xl border border-stone-200/80 bg-white/95 px-4 py-3 text-left font-sans text-sm leading-6 text-stone-700 shadow-[0_14px_34px_rgba(120,113,108,0.18)] ring-1 ring-white/80 backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:bg-white hover:text-charcoal hover:shadow-[0_18px_42px_rgba(251,146,60,0.20)] sm:px-5 sm:py-4 sm:text-base"
+                      className="min-h-[56px] rounded-xl border border-stone-200/80 bg-white/95 px-3 py-2.5 text-left font-sans text-[13px] leading-5 text-stone-700 shadow-[0_10px_24px_rgba(120,113,108,0.15)] ring-1 ring-white/80 backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:bg-white hover:text-charcoal hover:shadow-[0_18px_42px_rgba(251,146,60,0.20)] sm:min-h-[64px] sm:rounded-2xl sm:px-5 sm:py-4 sm:text-base sm:leading-6"
                     >
                       {suggestion}
                     </button>
