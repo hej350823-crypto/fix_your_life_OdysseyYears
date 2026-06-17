@@ -9,6 +9,9 @@ interface OnboardingProps {
   onComplete: (data: UserData) => void;
 }
 
+const MAX_UPLOAD_EDGE = 1600;
+const UPLOAD_EXPORT_QUALITY = 0.84;
+
 const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName = '', onComplete }) => {
   const TEST_PROFILE_SOURCE = '/test-assets/test-source.png';
   const normalizedInitialName = initialName.trim();
@@ -52,13 +55,57 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
     setFocusedPoint(point);
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+
+  const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Image decode failed'));
+    image.src = src;
+  });
+
+  const compressPhoto = async (file: File) => {
+    const sourceDataUrl = await readFileAsDataUrl(file);
+    const image = await loadImage(sourceDataUrl);
+    const longestEdge = Math.max(image.naturalWidth, image.naturalHeight);
+
+    if (longestEdge <= MAX_UPLOAD_EDGE) {
+      return sourceDataUrl;
+    }
+
+    const scale = MAX_UPLOAD_EDGE / longestEdge;
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return sourceDataUrl;
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', UPLOAD_EXPORT_QUALITY);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => setPhoto(reader.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressedPhoto = await compressPhoto(file);
+      setPhoto(compressedPhoto);
+    } catch (error) {
+      console.warn('Photo compression failed. Falling back to original upload.', error);
+      const fallbackPhoto = await readFileAsDataUrl(file);
+      setPhoto(fallbackPhoto);
+    }
   };
 
   const handleFinalize = () => {

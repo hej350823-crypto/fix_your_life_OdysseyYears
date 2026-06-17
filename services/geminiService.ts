@@ -10,8 +10,19 @@ export interface ChatResponse {
   audioBase64?: string;
 }
 
+interface ChatStreamEvent {
+  type: 'text_delta' | 'done' | 'error';
+  delta?: string;
+  data?: ChatResponse;
+  error?: string;
+}
+
+interface SendMessageOptions {
+  onTextChunk?: (chunk: string) => void;
+}
+
 export interface ChatSession {
-  sendMessage: (msg: string) => Promise<ChatResponse>;
+  sendMessage: (msg: string, options?: SendMessageOptions) => Promise<ChatResponse>;
 }
 
 type ApiErrorResponse = {
@@ -95,6 +106,96 @@ const postAiAction = async <TResponse>(action: string, payload: Record<string, u
   return response.json() as Promise<TResponse>;
 };
 
+const postAiActionStream = async (
+  action: string,
+  payload: Record<string, unknown>,
+  onEvent: (event: ChatStreamEvent) => void,
+): Promise<ChatResponse> => {
+  const nextPayload = { ...payload };
+  const promptSettings = nextPayload.promptSettings as PromptSettings | undefined;
+
+  if (hasCustomPromptSettings(promptSettings)) {
+    const adminToken = getAdminToken();
+    if (!adminToken) {
+      throw new Error('Prompt admin verification expired. Please re-enter the admin password before using custom prompts.');
+    }
+
+    nextPayload.adminToken = adminToken;
+  } else {
+    delete nextPayload.promptSettings;
+  }
+
+  const response = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action,
+      ...nextPayload,
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null) as ApiErrorResponse | null;
+    throw new Error(formatApiErrorMessage(detail, response.status));
+  }
+
+  if (!response.body) {
+    throw new Error('Streaming response body is unavailable.');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalResponse: ChatResponse | null = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const event = JSON.parse(trimmed) as ChatStreamEvent;
+      onEvent(event);
+
+      if (event.type === 'error') {
+        throw new Error(event.error || 'Streaming request failed.');
+      }
+
+      if (event.type === 'done' && event.data) {
+        finalResponse = event.data;
+      }
+    }
+
+    if (done) break;
+  }
+
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer.trim()) as ChatStreamEvent;
+    onEvent(event);
+
+    if (event.type === 'error') {
+      throw new Error(event.error || 'Streaming request failed.');
+    }
+
+    if (event.type === 'done' && event.data) {
+      finalResponse = event.data;
+    }
+  }
+
+  if (!finalResponse) {
+    throw new Error('Streaming response ended before completion.');
+  }
+
+  return finalResponse;
+};
+
 const createDemoResponse = (userData: UserData, turn: number): ChatResponse => {
   const currentTurn = Math.min(Math.max(turn, 1), MAX_CHAT_TURNS);
   const language = userData.language || 'zh';
@@ -131,7 +232,7 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
   let localTurn = 0;
 
   return {
-    sendMessage: async (msg: string) => {
+    sendMessage: async (msg: string, options?: SendMessageOptions) => {
       const nextDemoTurn = Math.min(localTurn + 1, MAX_CHAT_TURNS);
 
       if (userData.isTestMode) {
@@ -147,12 +248,16 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
       }
 
       try {
-        const response = await postAiAction<ChatResponse>('chat', {
+        const response = await postAiActionStream('chat-stream', {
           userData,
           message: msg,
           history,
           currentTurn: localTurn,
           promptSettings,
+        }, (event) => {
+          if (event.type === 'text_delta' && event.delta) {
+            options?.onTextChunk?.(event.delta);
+          }
         });
 
         localTurn = response.current_turn || nextDemoTurn;

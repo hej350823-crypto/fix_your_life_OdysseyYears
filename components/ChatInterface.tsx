@@ -68,20 +68,50 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   const text = t(language).chat;
   const testCopy = t(language).test;
 
+  const upsertLastAiMessage = (nextText: string, audioBase64?: string) => {
+    setMessages((prev) => {
+      if (prev.length === 0 || prev[prev.length - 1].sender !== 'ai') {
+        return [...prev, { sender: 'ai', text: nextText, audioBase64 }];
+      }
+
+      const lastMessage = prev[prev.length - 1];
+      return [
+        ...prev.slice(0, -1),
+        {
+          ...lastMessage,
+          text: nextText,
+          audioBase64: audioBase64 ?? lastMessage.audioBase64,
+        },
+      ];
+    });
+  };
+
   useEffect(() => {
     let cancelled = false;
 
     const init = async () => {
       chatSession.current = createChatSession(userData, promptSettings);
       setIsTyping(true);
-      const welcomeData = await chatSession.current.sendMessage(`(System: User arrived. Name: ${userData.name}. Start Turn 1.)`);
-      if (cancelled) return;
+      try {
+        let streamedText = '';
+        const welcomeData = await chatSession.current.sendMessage(`(System: User arrived. Name: ${userData.name}. Start Turn 1.)`, {
+          onTextChunk: (chunk) => {
+            if (cancelled) return;
+            streamedText += chunk;
+            upsertLastAiMessage(streamedText);
+          },
+        });
+        if (cancelled) return;
 
-      setMessages([{ sender: 'ai', text: welcomeData.text, audioBase64: welcomeData.audioBase64 }]);
-      setCurrentSuggestions(welcomeData.suggestions || []);
-      collectVisualTags(welcomeData.visual_tags, collectedTagsRef.current);
-      setTurnCount(welcomeData.current_turn || 1);
-      setIsTyping(false);
+        upsertLastAiMessage(welcomeData.text, welcomeData.audioBase64);
+        setCurrentSuggestions(welcomeData.suggestions || []);
+        collectVisualTags(welcomeData.visual_tags, collectedTagsRef.current);
+        setTurnCount(welcomeData.current_turn || 1);
+      } finally {
+        if (!cancelled) {
+          setIsTyping(false);
+        }
+      }
     };
 
     init();
@@ -110,13 +140,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
     setMessages((prev) => [...prev, { sender: 'user', text: textToSend }]);
     setIsTyping(true);
 
-    const response = await chatSession.current.sendMessage(textToSend);
+    try {
+      let streamedText = '';
+      const response = await chatSession.current.sendMessage(textToSend, {
+        onTextChunk: (chunk) => {
+          streamedText += chunk;
+          upsertLastAiMessage(streamedText);
+        },
+      });
 
-    collectVisualTags(response.visual_tags, collectedTagsRef.current);
-    setTurnCount(response.current_turn || turnCount + 1);
-    setMessages((prev) => [...prev, { sender: 'ai', text: response.text, audioBase64: response.audioBase64 }]);
-    setCurrentSuggestions(response.suggestions || []);
-    setIsTyping(false);
+      collectVisualTags(response.visual_tags, collectedTagsRef.current);
+      setTurnCount(response.current_turn || turnCount + 1);
+      upsertLastAiMessage(response.text, response.audioBase64);
+      setCurrentSuggestions(response.suggestions || []);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: language === 'zh'
+            ? `这次对话没有成功返回：${error instanceof Error ? error.message : '未知错误'}`
+            : `This chat response did not complete: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleVisualize = async () => {
