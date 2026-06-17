@@ -264,8 +264,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
         {
           sender: 'ai',
           text: language === 'zh'
-            ? `真实 AI 结果还没有生成成功：${error instanceof Error ? error.message : '未知错误'}。请先检查 VPN / 代理 / 网络出口，或打开测试模式体验完整流程。`
-            : `The real AI result could not be generated yet: ${error instanceof Error ? error.message : 'Unknown error'}. Check VPN / proxy / network access first, or turn on test mode to try the full flow.`,
+            ? `结果生成失败了。可能是网络、代理、接口配置或上游 AI 服务暂时不可用。错误信息：${error instanceof Error ? error.message : '未知错误'}`
+            : `The result could not be generated. It may be a network, proxy, API configuration, or upstream AI service issue. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         },
       ]);
     } finally {

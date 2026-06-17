@@ -274,8 +274,8 @@ export const createChatSession = (userData: UserData, promptSettings?: PromptSet
         if (!userData.isTestMode) {
           return {
             text: userData.language === 'zh'
-              ? `真实 AI API 还没有跑通：${e instanceof Error ? e.message : '未知错误'}。请先检查 VPN / 代理 / 网络出口，或者打开测试模式体验演示流程。`
-              : `The real AI API is not working yet: ${e instanceof Error ? e.message : 'Unknown error'}. Check VPN / proxy / network access first, or turn on test mode for the demo flow.`,
+              ? `这次对话没有成功连接到 AI 服务。可能是网络、代理、接口配置或上游服务暂时不可用。错误信息：${e instanceof Error ? e.message : '未知错误'}`
+              : `This chat could not connect to the AI service. It may be a network, proxy, API configuration, or upstream service issue. Error: ${e instanceof Error ? e.message : 'Unknown error'}`,
             suggestions: [],
             current_turn: localTurn,
           };
