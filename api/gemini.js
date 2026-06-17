@@ -452,6 +452,29 @@ ${assistantReply}
 Previous current_turn: ${currentTurn}
 `;
 
+const extractChatReplyContent = (content = '') => {
+  const cleaned = cleanJsonString(content);
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    const text = parsed.text || parsed.reply || parsed.message || parsed.response || '';
+
+    if (typeof text === 'string' && text.trim()) {
+      return {
+        text: text.trim(),
+        metadata: parsed,
+      };
+    }
+  } catch {
+    // Plain text is the expected response for streaming chat.
+  }
+
+  return {
+    text: content.trim(),
+    metadata: null,
+  };
+};
+
 const formatCapsuleMessageHtml = (message = '') => escapeHtml(message).replace(/\n/g, '<br />');
 
 const isValidEmail = (email = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -798,6 +821,8 @@ const handleChatStream = async (res, body) => {
   const transcript = safeHistory
     .map((entry) => `${entry.sender === 'user' ? 'User' : 'Future Self'}: ${entry.text}`)
     .join('\n');
+  let pendingStreamText = '';
+  let shouldHoldStream = null;
 
   const streamedReply = await callTextModelStream({
     messages: [
@@ -825,20 +850,47 @@ Previous current_turn: ${currentTurn}
       },
     ],
     maxTokens: 900,
-    onDelta: (delta) => writeStreamEvent(res, { type: 'text_delta', delta }),
+    onDelta: (delta) => {
+      pendingStreamText += delta;
+
+      if (shouldHoldStream === null) {
+        const visibleText = pendingStreamText.trimStart();
+        const firstVisibleChar = visibleText[0];
+        if (!firstVisibleChar) return;
+
+        shouldHoldStream = firstVisibleChar === '{' || firstVisibleChar === '[' || visibleText.startsWith('```');
+        if (!shouldHoldStream) {
+          writeStreamEvent(res, { type: 'text_delta', delta: pendingStreamText });
+          pendingStreamText = '';
+        }
+        return;
+      }
+
+      if (!shouldHoldStream) {
+        writeStreamEvent(res, { type: 'text_delta', delta });
+      }
+    },
   });
 
-  const replyText = (streamedReply || '').trim() || createDemoResponse(name, currentTurn, language).text;
+  const normalizedReply = extractChatReplyContent(streamedReply || '');
+  const replyText = normalizedReply.text || createDemoResponse(name, currentTurn, language).text;
 
-  const metadataContent = await callTextModel({
-    messages: [
-      {
-        role: 'system',
-        content: createChatMetadataPrompt({ currentTurn, assistantReply: replyText, language }),
-      },
-      {
-        role: 'user',
-        content: `
+  if (shouldHoldStream) {
+    writeStreamEvent(res, { type: 'text_delta', delta: replyText });
+  }
+
+  let parsed = normalizedReply.metadata;
+
+  if (!parsed || !Array.isArray(parsed.suggestions)) {
+    const metadataContent = await callTextModel({
+      messages: [
+        {
+          role: 'system',
+          content: createChatMetadataPrompt({ currentTurn, assistantReply: replyText, language }),
+        },
+        {
+          role: 'user',
+          content: `
 Conversation history:
 ${transcript || '(no previous history)'}
 
@@ -848,18 +900,18 @@ ${message}
 Assistant reply:
 ${replyText}
 `,
-      },
-    ],
-    responseFormat: { type: 'json_object' },
-    maxTokens: 500,
-  });
+        },
+      ],
+      responseFormat: { type: 'json_object' },
+      maxTokens: 500,
+    });
 
-  let parsed;
-  try {
-    parsed = JSON.parse(cleanJsonString(metadataContent || '{}'));
-  } catch (e) {
-    console.error('Chat metadata JSON parse error', e);
-    parsed = createDemoResponse(name, currentTurn, language);
+    try {
+      parsed = JSON.parse(cleanJsonString(metadataContent || '{}'));
+    } catch (e) {
+      console.error('Chat metadata JSON parse error', e);
+      parsed = createDemoResponse(name, currentTurn, language);
+    }
   }
 
   const finalResponse = {
