@@ -97,7 +97,7 @@ const Hero: React.FC<HeroProps> = ({ language, setViewState }) => {
     <section
       ref={sectionRef}
       onMouseMove={handleMouseMove}
-      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden selection:bg-orange-100"
+      className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-16 pt-24 selection:bg-orange-100 md:min-h-screen md:px-0 md:pb-0 md:pt-0"
     >
       <div className="absolute inset-0 pointer-events-none">
         <div className="hero-fog-tint absolute inset-0" />
@@ -120,35 +120,34 @@ const Hero: React.FC<HeroProps> = ({ language, setViewState }) => {
         <div className="hero-bottom-image-fade absolute inset-x-0 bottom-0 h-56 pointer-events-none" />
       </div>
 
-      <div className="relative z-10 w-full max-w-5xl mx-auto px-6 flex flex-col items-center text-center space-y-10 md:space-y-12 pt-10">
-        <h1 className="font-serif text-6xl md:text-8xl lg:text-9xl text-charcoal tracking-tighter leading-none">
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center space-y-8 px-4 pt-6 text-center sm:px-6 md:space-y-12 md:px-6 md:pt-10">
+        <h1 className="font-serif text-4xl leading-[0.95] tracking-tight text-charcoal sm:text-5xl md:text-8xl md:tracking-tighter lg:text-9xl">
           {text.title}
         </h1>
 
-        <div className="space-y-6">
-          <h2 className="font-serif text-2xl md:text-4xl text-stone-600 not-italic">
+        <div className="space-y-4 md:space-y-6">
+          <h2 className="font-serif text-xl text-stone-600 not-italic sm:text-2xl md:text-4xl">
             {text.subtitle}
           </h2>
-          <p className="font-sans text-stone-500 text-base md:text-lg max-w-xl mx-auto font-light leading-relaxed">
+          <p className="mx-auto max-w-xl font-sans text-sm font-light leading-7 text-stone-500 sm:text-base md:text-lg md:leading-relaxed">
             {text.description}
           </p>
         </div>
 
         <button
           onClick={() => setViewState(ViewState.ONBOARDING)}
-          className="group relative inline-flex items-center gap-3 px-12 py-5 rounded-full bg-charcoal text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-orange-200/50"
+          className="group relative inline-flex items-center gap-3 rounded-full bg-charcoal px-8 py-4 text-white transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-orange-200/50 sm:px-10 md:px-12 md:py-5"
         >
-          <span className="relative font-sans font-medium tracking-wide text-lg">
+          <span className="relative font-sans text-base font-medium tracking-wide md:text-lg">
             {text.cta}
           </span>
           <svg className="relative w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 8l4 4m0 0l-4 4m4-4H3" />
           </svg>
         </button>
-
       </div>
 
-      <nav className="absolute top-0 left-0 right-0 p-8 flex items-center z-20">
+      <nav className="absolute left-0 right-0 top-0 z-20 flex items-center p-5 md:p-8">
         <div className="w-8 h-8 rounded-full bg-charcoal/10" />
       </nav>
     </section>

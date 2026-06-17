@@ -91,7 +91,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
   const progressWidth = step === 0 ? '33%' : step === 1 ? '66%' : '100%';
 
   return (
-    <div className={`min-h-screen flex flex-col items-center relative overflow-hidden transition-opacity duration-700 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
+    <div className={`relative flex min-h-[100svh] flex-col items-center overflow-hidden transition-opacity duration-700 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
       <div className="absolute inset-0 bg-gradient-to-br from-warmWhite via-orange-50/40 to-purple-50/30 -z-10 transition-colors duration-1000" />
 
       <div className="w-full h-1 bg-stone-100 fixed top-0 left-0 z-50">
@@ -101,25 +101,25 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
         />
       </div>
 
-      <div className="flex-1 w-full max-w-4xl mx-auto flex flex-col justify-center px-6 py-12">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center px-5 py-24 sm:px-6 md:py-12">
         {testMode && (
-          <div className="absolute left-6 top-6 z-40 flex flex-col items-start gap-2">
+          <div className="absolute left-5 top-20 z-40 flex max-w-[calc(100%-40px)] flex-col items-start gap-2 md:left-6 md:top-6">
             <button
               type="button"
               onClick={loadTestProfile}
-              className="rounded-full bg-charcoal px-5 py-2 text-sm font-medium text-white shadow-lg hover:bg-black"
+              className="rounded-full bg-charcoal px-4 py-2 text-xs font-medium text-white shadow-lg hover:bg-black sm:px-5 sm:text-sm"
             >
               {loadedTestProfile ? text.testProfileReady : text.useTestProfile}
             </button>
-            <span className="rounded-full bg-white/75 px-4 py-1 text-xs text-stone-500 shadow-sm backdrop-blur">
+            <span className="rounded-full bg-white/75 px-4 py-1 text-[11px] text-stone-500 shadow-sm backdrop-blur sm:text-xs">
               {text.privacyNote}
             </span>
           </div>
         )}
 
         {step === 0 && (
-          <div className="flex flex-col items-center text-center space-y-12 animate-fade-in-up">
-            <h2 className="font-serif text-3xl md:text-4xl text-stone-600">
+          <div className="animate-fade-in-up flex flex-col items-center space-y-8 text-center md:space-y-12">
+            <h2 className="font-serif text-2xl text-stone-600 sm:text-3xl md:text-4xl">
               {text.nameQuestion}
             </h2>
 
@@ -129,7 +129,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className={`w-full bg-transparent text-center font-serif text-5xl md:text-7xl text-charcoal placeholder:text-stone-200 outline-none border-b-2 border-transparent focus:border-stone-200 transition-all pb-4 ${shake ? 'translate-x-[-10px]' : ''}`}
+                className={`w-full border-b-2 border-transparent bg-transparent pb-4 text-center font-serif text-4xl text-charcoal outline-none transition-all placeholder:text-stone-200 focus:border-stone-200 sm:text-5xl md:text-7xl ${shake ? 'translate-x-[-10px]' : ''}`}
                 placeholder={text.namePlaceholder}
                 style={{ animation: shake ? 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both' : 'none' }}
               />
@@ -140,7 +140,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                 <button
                   type="submit"
                   disabled={!name.trim()}
-                  className="rounded-full bg-charcoal px-9 py-4 font-sans text-base font-medium tracking-wide text-white shadow-xl shadow-stone-300/30 transition-all duration-500 hover:-translate-y-0.5 hover:bg-black disabled:pointer-events-none disabled:translate-y-3 disabled:opacity-0"
+                  className="rounded-full bg-charcoal px-8 py-4 font-sans text-sm font-medium tracking-wide text-white shadow-xl shadow-stone-300/30 transition-all duration-500 hover:-translate-y-0.5 hover:bg-black sm:px-9 sm:text-base disabled:pointer-events-none disabled:translate-y-3 disabled:opacity-0"
                 >
                   <span className="inline-flex items-center gap-3">
                     {text.nameContinue}
@@ -153,16 +153,16 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
         )}
 
         {step === 1 && (
-          <div className="flex flex-col items-center text-center space-y-4 animate-fade-in-up">
+          <div className="animate-fade-in-up flex flex-col items-center space-y-4 text-center">
             <div className="space-y-4">
-              <h2 className="font-serif text-4xl md:text-5xl text-charcoal">
+              <h2 className="font-serif text-3xl text-charcoal sm:text-4xl md:text-5xl">
                 {text.hello}, {name}.
               </h2>
-              <div className="space-y-10">
-                <p className="font-serif text-2xl text-stone-500 not-italic">
+              <div className="space-y-6 md:space-y-10">
+                <p className="font-serif text-xl text-stone-500 not-italic sm:text-2xl">
                   {text.painQuestion}
                 </p>
-                <div className="min-h-[48px]">
+                <div className="min-h-[72px] md:min-h-[48px]">
                   {previewPoint && (
                     <p className="mx-auto max-w-3xl text-base leading-7 text-stone-500 transition-all duration-300">
                       “{previewPoint.preview}”
@@ -172,7 +172,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
               </div>
             </div>
 
-            <div className="w-full max-w-5xl grid gap-x-8 gap-y-4 md:grid-cols-2">
+            <div className="grid w-full max-w-5xl gap-x-8 gap-y-4 md:grid-cols-2">
               {text.painPointGroups.map((group) => (
                 <div key={group.title} className="space-y-3">
                   <div className="text-center text-[11px] uppercase tracking-[0.24em] text-stone-300">
@@ -188,7 +188,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                           onClick={() => togglePoint(point.title)}
                           onMouseEnter={() => setHoveredPoint(point.title)}
                           onMouseLeave={() => setHoveredPoint(null)}
-                          className={`px-5 py-2.5 rounded-full text-base md:text-lg transition-all duration-300 transform ${
+                          className={`rounded-full px-4 py-2.5 text-sm transition-all duration-300 transform sm:px-5 sm:text-base md:text-lg ${
                             isSelected
                               ? 'bg-orange-100 text-charcoal shadow-md scale-105 border border-orange-200'
                               : 'bg-white text-stone-500 border border-stone-100 hover:-translate-y-1 hover:border-stone-300'
@@ -203,11 +203,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
               ))}
             </div>
 
-            <div className="pt-8">
+            <div className="pt-6 md:pt-8">
               <button
                 onClick={() => setStep(2)}
                 disabled={selectedPoints.length === 0}
-                className="px-10 py-4 bg-charcoal text-white rounded-full text-lg font-medium tracking-wide shadow-lg hover:bg-black hover:shadow-orange-200/50 transition-all disabled:opacity-0 disabled:translate-y-4"
+                className="rounded-full bg-charcoal px-8 py-4 text-base font-medium tracking-wide text-white shadow-lg transition-all hover:bg-black hover:shadow-orange-200/50 sm:px-10 sm:text-lg disabled:translate-y-4 disabled:opacity-0"
               >
                 {text.continue}
               </button>
@@ -216,9 +216,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
         )}
 
         {step === 2 && (
-          <div className="flex flex-col items-center text-center space-y-10 animate-fade-in-up">
+          <div className="animate-fade-in-up flex flex-col items-center space-y-8 text-center md:space-y-10">
             <div className="space-y-2">
-              <h2 className="font-serif text-3xl md:text-4xl text-charcoal">
+              <h2 className="font-serif text-2xl text-charcoal sm:text-3xl md:text-4xl">
                 {text.photoTitle}
               </h2>
               <p className="font-sans text-stone-400 tracking-wide uppercase text-xs">
@@ -227,7 +227,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
             </div>
 
             <div
-              className="relative w-64 h-80 md:w-80 md:h-96 rounded-t-[160px] rounded-b-[20px] bg-stone-100 overflow-hidden cursor-pointer group shadow-2xl transition-all hover:shadow-orange-100/50 border-4 border-white"
+              className="group relative h-72 w-56 cursor-pointer overflow-hidden rounded-b-[20px] rounded-t-[140px] border-4 border-white bg-stone-100 shadow-2xl transition-all hover:shadow-orange-100/50 sm:h-80 sm:w-64 md:h-96 md:w-80 md:rounded-t-[160px]"
               onClick={() => fileInputRef.current?.click()}
             >
               <input
@@ -272,7 +272,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                         setPhoto(testProfile.photo);
                         setLoadedTestProfile(true);
                       }}
-                      className="rounded-full border border-stone-200 bg-white px-5 py-2 text-sm text-stone-600 shadow-sm hover:border-orange-200 hover:text-charcoal"
+                      className="rounded-full border border-stone-200 bg-white px-4 py-2 text-xs text-stone-600 shadow-sm hover:border-orange-200 hover:text-charcoal sm:px-5 sm:text-sm"
                     >
                       {text.useTestPhoto}
                     </button>
@@ -286,7 +286,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                   </p>
                   <button
                     onClick={handleFinalize}
-                    className="px-12 py-4 bg-gradient-to-r from-warmOrange to-orange-400 text-white rounded-full text-lg font-medium shadow-lg hover:shadow-orange-200 hover:-translate-y-1 transition-all"
+                    className="rounded-full bg-gradient-to-r from-warmOrange to-orange-400 px-10 py-4 text-base font-medium text-white shadow-lg transition-all hover:-translate-y-1 hover:shadow-orange-200 sm:px-12 sm:text-lg"
                   >
                     {text.start}
                   </button>
