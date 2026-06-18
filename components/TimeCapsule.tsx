@@ -111,10 +111,10 @@ const TimeCapsule: React.FC<TimeCapsuleProps> = ({
             <div className="inline-flex max-w-xl rounded-full border border-stone-200/80 bg-white/85 px-4 py-2 text-sm leading-relaxed text-stone-500 shadow-[0_10px_30px_rgba(120,113,108,0.08)] backdrop-blur">
               {text.previewNotice}
             </div>
-            <h1 className="max-w-[9.5em] font-serif text-4xl leading-[1.18] text-charcoal [text-wrap:balance] sm:text-5xl md:text-[4.25rem] md:leading-[1.2]">
+            <h1 className="w-full max-w-xl font-serif text-[1.51875rem] leading-[1.22] text-charcoal sm:text-[2.025rem] sm:leading-[1.22] md:text-[2.86875rem] md:leading-[1.24]">
               {text.title}
             </h1>
-            <p className="font-sans text-lg text-stone-600 leading-relaxed">{text.description}</p>
+            <p className="max-w-xl font-sans text-lg text-stone-600 leading-relaxed">{text.description}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="rounded-[28px] bg-white/92 p-7 md:p-12 shadow-[0_28px_80px_rgba(120,113,108,0.18)] border border-white/80 space-y-8 backdrop-blur">

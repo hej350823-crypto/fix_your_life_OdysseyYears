@@ -320,7 +320,7 @@ export const copy: Record<Language, Copy> = {
     timeCapsule: {
       eyebrow: '未来邮局',
       previewNotice: '时间胶囊邮箱发送功能暂未开放，后续版本会支持寄送到未来的自己。',
-      title: '将今天的迷茫收藏，寄给未来改变后的你。',
+      title: '将今天的迷茫收藏，寄给未来改变后的你',
       description: '填好邮箱后，我们会把今天的信和画像一起封存起来。它们不会现在打开，而会在未来某一天回到你手里，提醒你：你曾经从这里出发。',
       deliveryPreview: '这封信和今天的画像会在 {date} 回到你的邮箱。',
       emailLabel: '收信邮箱',
