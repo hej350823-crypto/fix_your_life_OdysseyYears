@@ -147,9 +147,6 @@ const Hero: React.FC<HeroProps> = ({ language, setViewState }) => {
         </button>
       </div>
 
-      <nav className="absolute left-0 right-0 top-0 z-20 flex items-center p-5 md:p-8">
-        <div className="w-8 h-8 rounded-full bg-charcoal/10" />
-      </nav>
     </section>
   );
 };

@@ -30,12 +30,6 @@ const AppControls: React.FC<AppControlsProps> = ({
         {language === 'zh' ? '我想说' : 'A Note'}
       </button>
       <button
-        onClick={onOpenAdmin}
-        className="rounded-full bg-white/85 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-600 shadow-sm backdrop-blur hover:text-charcoal sm:px-4 sm:text-xs sm:tracking-[0.14em]"
-      >
-        Admin
-      </button>
-      <button
         onClick={onToggleLanguage}
         className="rounded-full bg-white/85 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-600 shadow-sm backdrop-blur hover:text-charcoal sm:px-4 sm:text-xs sm:tracking-[0.16em]"
       >
@@ -48,6 +42,12 @@ const AppControls: React.FC<AppControlsProps> = ({
         }`}
       >
         {testMode ? text.app.testMode : text.app.normalMode}
+      </button>
+      <button
+        onClick={onOpenAdmin}
+        className="rounded-full bg-white/85 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-600 shadow-sm backdrop-blur hover:text-charcoal sm:px-4 sm:text-xs sm:tracking-[0.14em]"
+      >
+        Admin
       </button>
     </div>
   );

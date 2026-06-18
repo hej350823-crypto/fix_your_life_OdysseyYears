@@ -66,6 +66,10 @@ type Copy = {
     photoTitle: string;
     photoSubtitle: string;
     upload: string;
+    takePhoto: string;
+    capturePhoto: string;
+    closeCamera: string;
+    cameraError: string;
     useTestPhoto: string;
     photoRequired: string;
     photoQuote: string;
@@ -96,7 +100,13 @@ type Copy = {
     badge: string;
     salutation: string;
     save: string;
+    saving: string;
+    saveError: string;
     restart: string;
+    restartConfirmTitle: string;
+    restartConfirmBody: string;
+    restartConfirmCancel: string;
+    restartConfirmAction: string;
     continue: string;
   };
   timeCapsule: {
@@ -195,8 +205,12 @@ export const copy: Record<Language, Copy> = {
       photoTitle: '留下一张现在的你。',
       photoSubtitle: '我们只在本次体验中使用它，测试时也可以直接用模拟照片。',
       upload: '上传照片',
+      takePhoto: '拍摄照片',
+      capturePhoto: '使用这张',
+      closeCamera: '关闭摄像头',
+      cameraError: '无法打开摄像头，请检查浏览器权限，或改用上传照片。',
       useTestPhoto: '使用测试照片',
-      photoRequired: '请先上传照片，才能开始对话。',
+      photoRequired: '请先上传或拍摄照片，才能开始对话。',
       photoQuote: '“画面可以模糊，但诚实会让方向变清楚。”',
       start: '开始对话',
       privacyNote: '测试模式不会调用真实 API，也不会上传图片。',
@@ -294,13 +308,19 @@ export const copy: Record<Language, Copy> = {
       badge: '未来的你',
       salutation: '写给过去的我：',
       save: '保存到日记',
+      saving: '正在保存',
+      saveError: '保存失败，请稍后再试。',
       restart: '开始新一轮',
+      restartConfirmTitle: '确定要开始新一轮吗？',
+      restartConfirmBody: '如果还没有保存，这次对话和来自未来的信都会离开当前页面。',
+      restartConfirmCancel: '先留下',
+      restartConfirmAction: '确定开始',
       continue: '寄给未来的 TA',
     },
     timeCapsule: {
       eyebrow: '未来邮局',
       previewNotice: '时间胶囊邮箱发送功能暂未开放，后续版本会支持寄送到未来的自己。',
-      title: '把今天的迷雾寄给未来。',
+      title: '将今天的迷茫收藏，寄给未来改变后的你。',
       description: '填好邮箱后，我们会把今天的信和画像一起封存起来。它们不会现在打开，而会在未来某一天回到你手里，提醒你：你曾经从这里出发。',
       deliveryPreview: '这封信和今天的画像会在 {date} 回到你的邮箱。',
       emailLabel: '收信邮箱',
@@ -391,8 +411,12 @@ export const copy: Record<Language, Copy> = {
       photoTitle: "Let's capture your current state.",
       photoSubtitle: 'It stays in this experience. In test mode, you can use a simulated photo.',
       upload: 'Upload photo',
+      takePhoto: 'Take photo',
+      capturePhoto: 'Use this photo',
+      closeCamera: 'Close camera',
+      cameraError: 'Could not open the camera. Please check browser permissions or upload a photo instead.',
       useTestPhoto: 'Use test photo',
-      photoRequired: 'Please upload a photo before starting the conversation.',
+      photoRequired: 'Please upload or take a photo before starting the conversation.',
       photoQuote: '"The image may be blurred. Honesty brings clarity."',
       start: 'Start the Conversation',
       privacyNote: 'Test mode does not call the real API or upload images.',
@@ -490,13 +514,19 @@ export const copy: Record<Language, Copy> = {
       badge: 'The Future You',
       salutation: 'Dear Past Self,',
       save: 'Save to Journal',
+      saving: 'Saving',
+      saveError: 'Could not save the image. Please try again.',
       restart: 'Start New Cycle',
+      restartConfirmTitle: 'Start a new cycle?',
+      restartConfirmBody: 'If you have not saved this yet, the conversation and future letter will leave this page.',
+      restartConfirmCancel: 'Stay here',
+      restartConfirmAction: 'Start new cycle',
       continue: 'Send to Future You',
     },
     timeCapsule: {
       eyebrow: 'Future Mailbox',
       previewNotice: 'Time-capsule email delivery is not live yet. A future release will let you send this to your future self.',
-      title: 'Send today’s fog into the future.',
+      title: 'Save today’s uncertainty for the future you who has changed.',
       description: 'After you enter your email, we will seal today’s letter and portrait together. They will return on a future day, reminding you: this is where you began.',
       deliveryPreview: 'This letter and present portrait will return to your inbox on {date}.',
       emailLabel: 'Delivery email',

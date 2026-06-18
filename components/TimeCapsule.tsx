@@ -106,12 +106,14 @@ const TimeCapsule: React.FC<TimeCapsuleProps> = ({
           </button>
         </div>
 
-        <div className="grid lg:grid-cols-[0.62fr_1.38fr] gap-10 lg:gap-16 items-center">
+        <div className="grid lg:grid-cols-[0.76fr_1.24fr] gap-10 lg:gap-16 items-center">
           <div className="space-y-6 lg:pb-16">
             <div className="inline-flex max-w-xl rounded-full border border-stone-200/80 bg-white/85 px-4 py-2 text-sm leading-relaxed text-stone-500 shadow-[0_10px_30px_rgba(120,113,108,0.08)] backdrop-blur">
               {text.previewNotice}
             </div>
-            <h1 className="font-serif text-4xl md:text-6xl text-charcoal leading-tight">{text.title}</h1>
+            <h1 className="max-w-[9.5em] font-serif text-4xl leading-[1.18] text-charcoal [text-wrap:balance] sm:text-5xl md:text-[4.25rem] md:leading-[1.2]">
+              {text.title}
+            </h1>
             <p className="font-sans text-lg text-stone-600 leading-relaxed">{text.description}</p>
           </div>
 
@@ -125,13 +127,12 @@ const TimeCapsule: React.FC<TimeCapsuleProps> = ({
                 <button
                   key={option}
                   type="button"
-                  onClick={() => !isPreviewMode && setDelay(option)}
-                  disabled={isPreviewMode}
+                  onClick={() => setDelay(option)}
                   className={`rounded-full border px-5 py-4 text-base transition-all ${
                     delay === option
-                      ? 'border-charcoal bg-charcoal text-white shadow-sm'
-                      : 'border-stone-200 bg-white text-stone-500 hover:border-stone-300'
-                  } disabled:cursor-not-allowed disabled:hover:border-stone-200`}
+                      ? 'border-stone-400 bg-stone-100 text-stone-700 shadow-sm'
+                      : 'border-stone-200 bg-white/70 text-stone-400 hover:border-stone-300 hover:text-stone-600'
+                  }`}
                 >
                   {text.delays[option]}
                 </button>

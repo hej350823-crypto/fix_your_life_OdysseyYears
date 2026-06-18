@@ -29,7 +29,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
   const [focusedPoint, setFocusedPoint] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const text = t(language).onboarding;
   const testProfile = t(language).test.profile;
   const allPainPointOptions = text.painPointGroups.flatMap((group) => group.options);
@@ -40,6 +44,64 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
       setLoadedTestProfile(false);
     }
   }, [testMode, loadedTestProfile]);
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  useEffect(() => {
+    if (!cameraOpen) {
+      stopCamera();
+      return;
+    }
+
+    let cancelled = false;
+
+    const startCamera = async () => {
+      setCameraError('');
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError(text.cameraError);
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 960 },
+          },
+          audio: false,
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        cameraStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch (error) {
+        console.warn('Camera access failed.', error);
+        setCameraError(text.cameraError);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      cancelled = true;
+      stopCamera();
+    };
+  }, [cameraOpen, text.cameraError]);
 
   const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,8 +163,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
     }
   };
 
-  const compressPhoto = async (file: File) => {
-    const sourceDataUrl = await readFileAsDataUrl(file);
+  const compressPhotoDataUrl = async (sourceDataUrl: string) => {
     const image = await loadImage(sourceDataUrl);
     const imageWidth = image.naturalWidth;
     const imageHeight = image.naturalHeight;
@@ -149,6 +210,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
     return canvas.toDataURL('image/jpeg', UPLOAD_EXPORT_QUALITY);
   };
 
+  const compressPhoto = async (file: File) => {
+    const sourceDataUrl = await readFileAsDataUrl(file);
+    return compressPhotoDataUrl(sourceDataUrl);
+  };
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -161,6 +227,30 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
       const fallbackPhoto = await readFileAsDataUrl(file);
       setPhoto(fallbackPhoto);
     }
+  };
+
+  const handleCapturePhoto = async () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const capturedPhoto = canvas.toDataURL('image/jpeg', UPLOAD_EXPORT_QUALITY);
+    try {
+      setPhoto(await compressPhotoDataUrl(capturedPhoto));
+    } catch (error) {
+      console.warn('Captured photo compression failed. Using raw capture.', error);
+      setPhoto(capturedPhoto);
+    }
+    setCameraOpen(false);
   };
 
   const handleFinalize = () => {
@@ -340,7 +430,23 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                 hidden
               />
 
-              {photo ? (
+              {cameraOpen ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="h-full w-full scale-x-[-1] object-cover"
+                  />
+                  {cameraError && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-stone-100 px-6 text-center text-sm leading-6 text-stone-500">
+                      {cameraError}
+                    </div>
+                  )}
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-charcoal/18 via-transparent to-white/10" />
+                </>
+              ) : photo ? (
                 <>
                   <img
                     src={photo}
@@ -362,6 +468,33 @@ const Onboarding: React.FC<OnboardingProps> = ({ language, testMode, initialName
                   </div>
                   <span className="relative z-10 font-serif italic text-lg">{text.upload}</span>
                 </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-full border border-stone-200 bg-white px-5 py-2.5 text-sm font-medium text-stone-600 shadow-sm transition-all hover:border-orange-200 hover:text-charcoal"
+              >
+                {text.upload}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCameraOpen((open) => !open)}
+                className="rounded-full bg-charcoal px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-black"
+              >
+                {cameraOpen ? text.closeCamera : text.takePhoto}
+              </button>
+              {cameraOpen && (
+                <button
+                  type="button"
+                  onClick={handleCapturePhoto}
+                  disabled={Boolean(cameraError)}
+                  className="rounded-full bg-gradient-to-r from-warmOrange to-orange-400 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-orange-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {text.capturePhoto}
+                </button>
               )}
             </div>
 

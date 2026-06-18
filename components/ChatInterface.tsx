@@ -11,8 +11,8 @@ import { ConversationStage, GenerationResult, Language, Message, PromptSettings,
 
 const MAX_CHAT_TURNS = 6;
 const STREAM_MIN_CHARS_PER_TICK = 1;
-const STREAM_MAX_CHARS_PER_TICK = 3;
-const STREAM_TICK_MS = 42;
+const STREAM_MAX_CHARS_PER_TICK = 2;
+const STREAM_TICK_MS = 56;
 
 interface ChatInterfaceProps {
   userData: UserData;
@@ -456,7 +456,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
                       <div className="absolute -left-8 top-1 text-orange-400 opacity-80 text-xl animate-pulse-slow hidden md:block">
                         ✴
                       </div>
-                      <div className="font-serif text-xl leading-relaxed tracking-tight text-charcoal sm:text-2xl md:text-3xl">
+                      <div className="font-serif text-lg leading-[1.58] text-charcoal sm:text-xl sm:leading-[1.66] md:text-2xl md:leading-[1.74]">
                         {msg.text}
                       </div>
                     </div>
@@ -464,7 +464,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
 
                   {isUser && (
                     <div className="mt-5 flex justify-end animate-fade-in-up md:mt-8">
-                      <div className="max-w-[92%] border-r-2 border-stone-200 pr-4 text-right font-sans text-base font-light leading-7 text-stone-600 sm:text-lg md:pr-6 md:text-xl md:leading-relaxed">
+                      <div className="max-w-[92%] border-r-2 border-stone-200 pr-4 text-right font-sans text-sm font-light leading-6 text-stone-600 sm:text-base sm:leading-7 md:pr-6 md:text-lg md:leading-8">
                         {msg.text}
                       </div>
                     </div>
