@@ -13,6 +13,8 @@ const MAX_CHAT_TURNS = 6;
 const STREAM_MIN_CHARS_PER_TICK = 1;
 const STREAM_MAX_CHARS_PER_TICK = 2;
 const STREAM_TICK_MS = 56;
+const GENERATION_PROGRESS_DURATION_MS = 60_000;
+const TEST_GENERATION_WAIT_MS = 5_000;
 
 interface ChatInterfaceProps {
   userData: UserData;
@@ -43,16 +45,28 @@ const inputFadeByStage: Record<ConversationStage, string> = {
 
 const generationStepsByLanguage: Record<Language, string[]> = {
   zh: [
-    '整理你的对话线索',
-    '提炼未来自我的气质',
-    '写下未来想对你说的话',
-    '生成那张穿过迷雾后的画像',
+    '整理你的对话线索……',
+    '把零散的感受放回它们的位置……',
+    '提炼未来自我的气质……',
+    '辨认那些真正让你安定的方向……',
+    '写下未来想对你说的话……',
+    '让模糊的愿望慢慢显影……',
+    '为改变后的你寻找合适的光……',
+    '生成那张穿过迷雾后的画像……',
+    '把今天的犹豫轻轻收好……',
+    '快好了，未来的你正在靠近……',
   ],
   en: [
-    'Organizing your conversation clues',
-    'Finding the tone of your future self',
-    'Writing what the future wants to say',
-    'Rendering the portrait beyond the fog',
+    'Organizing your conversation clues...',
+    'Putting scattered feelings back into place...',
+    'Finding the tone of your future self...',
+    'Noticing what could truly steady you...',
+    'Writing what the future wants to say...',
+    'Letting the unclear wish slowly appear...',
+    'Finding the right light for the changed you...',
+    'Rendering the portrait beyond the fog...',
+    'Gently holding today’s hesitation...',
+    'Almost there, your future self is coming closer...',
   ],
 };
 
@@ -84,6 +98,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   const [turnCount, setTurnCount] = useState(0);
   const [currentSuggestions, setCurrentSuggestions] = useState<string[]>([]);
   const [generationStep, setGenerationStep] = useState(0);
+  const [generationProgress, setGenerationProgress] = useState(0);
 
   const collectedTagsRef = useRef<Set<string>>(new Set());
   const chatSession = useRef<ChatSession | null>(null);
@@ -259,14 +274,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   useEffect(() => {
     if (!isGenerating) {
       setGenerationStep(0);
+      setGenerationProgress(0);
       return undefined;
     }
 
-    const intervalId = window.setInterval(() => {
+    const startedAt = Date.now();
+    const stepIntervalId = window.setInterval(() => {
       setGenerationStep((current) => Math.min(current + 1, generationStepsByLanguage[language].length - 1));
-    }, 2600);
+    }, 5000);
+    const progressIntervalId = window.setInterval(() => {
+      setGenerationProgress(Math.min((Date.now() - startedAt) / GENERATION_PROGRESS_DURATION_MS, 1));
+    }, 250);
 
-    return () => window.clearInterval(intervalId);
+    return () => {
+      window.clearInterval(stepIntervalId);
+      window.clearInterval(progressIntervalId);
+    };
   }, [isGenerating, language]);
 
   const handleSend = async (textOverride?: string) => {
@@ -313,6 +336,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
       const tagsArray: string[] = Array.from(collectedTagsRef.current);
 
       if (testMode || userData.isTestMode) {
+        await wait(TEST_GENERATION_WAIT_MS);
         onComplete({
           imageUrl: '/test-assets/future-self.png',
           letter: testCopy.finalLetter,
@@ -355,20 +379,60 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ userData, language, testM
   };
 
   const generationSteps = generationStepsByLanguage[language];
+  const generationProgressCircumference = 2 * Math.PI * 54;
+  const generationProgressDash = `${generationProgress * generationProgressCircumference} ${generationProgressCircumference}`;
 
   if (isGenerating) {
     return (
-      <div className="flex h-[100dvh] min-h-[100svh] flex-col items-center justify-center space-y-8 bg-warmWhite px-6 animate-pulse-slow md:min-h-screen">
-        <div className="relative h-32 w-32">
-          <div className="absolute inset-0 rounded-full bg-orange-200 blur-3xl animate-pulse" />
-          <div className="absolute inset-8 rounded-full bg-white/90 blur-xl" />
+      <div className="flex h-[100dvh] min-h-[100svh] flex-col items-center justify-center space-y-10 bg-warmWhite px-6 md:min-h-screen">
+        <div className="relative flex flex-col items-center gap-6">
+          <div className="relative flex h-40 w-40 items-center justify-center">
+          <div className="absolute inset-0 rounded-full bg-[rgba(255,237,213,0.46)] blur-3xl animate-pulse" />
+          <div className="absolute inset-9 rounded-full bg-white/72 blur-xl" />
+          <svg className="relative h-36 w-36 -rotate-90 drop-shadow-[0_18px_42px_rgba(120,113,108,0.10)]" viewBox="0 0 120 120" aria-hidden="true">
+            <defs>
+              <linearGradient id="generationProgressStroke" x1="14" y1="18" x2="106" y2="102" gradientUnits="userSpaceOnUse">
+                <stop stopColor="rgba(251, 191, 36, 0.72)" />
+                <stop offset="0.42" stopColor="rgba(251, 146, 60, 0.72)" />
+                <stop offset="0.72" stopColor="rgba(244, 114, 182, 0.58)" />
+                <stop offset="1" stopColor="rgba(196, 181, 253, 0.68)" />
+              </linearGradient>
+            </defs>
+            <circle
+              cx="60"
+              cy="60"
+              r="54"
+              fill="none"
+              stroke="rgba(231, 229, 228, 0.82)"
+              strokeWidth="1"
+            />
+            <circle
+              cx="60"
+              cy="60"
+              r="43"
+              fill="rgba(255, 255, 255, 0.52)"
+              stroke="none"
+            />
+            <circle
+              cx="60"
+              cy="60"
+              r="54"
+              fill="none"
+              stroke="url(#generationProgressStroke)"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={generationProgressDash}
+              className="transition-[stroke-dasharray] duration-700 ease-out"
+            />
+          </svg>
+          </div>
+          <p className="min-h-[1.5rem] max-w-sm text-center font-sans text-sm leading-6 text-stone-400 transition-opacity duration-500">
+            {generationSteps[generationStep]}
+          </p>
         </div>
         <div className="z-10 space-y-3 text-center">
           <h2 className="font-serif text-3xl text-charcoal">{text.generating}</h2>
           <p className="font-sans text-xs uppercase tracking-widest text-stone-400">{text.generatingSub}</p>
-          <p className="font-sans text-sm text-stone-400 transition-opacity duration-500">
-            {generationSteps[generationStep]}
-          </p>
         </div>
       </div>
     );
